@@ -1,11 +1,11 @@
 {
- "version": "1.4.1",
- "notes": "Option: remove all periods and commas",
+ "version": "1.4.3",
+ "notes": "2nd line never a single word",
  "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "4bf44c3801933651eaf30371ea8b72bd5e579099be419efd6243aa2819d34ff7"
+   "sha256": "1a6639596acb43d89e7e1251930302be7f52159a01b406ad2fa97e383943c208"
   },
   {
    "path": "css/style.css",
@@ -17,7 +17,7 @@
   },
   {
    "path": "js/captions.js",
-   "sha256": "8b3d1786b15ff0c3aa371f7d0d90c356c18dec9d3195ba98e5e80ed591bc60b4"
+   "sha256": "83a8bac0d2158faefc77784537a8a75f2e9b10873d38862c363a429e37fc0b59"
   },
   {
    "path": "js/elevenlabs.js",
@@ -25,7 +25,7 @@
   },
   {
    "path": "js/learn.js",
-   "sha256": "4a22f865b47d97dd1a956f1e05825a9afdaa1e281042447e0dad7bc815362ff1"
+   "sha256": "eb743d3d9792e9a414d69f42a3575f8cdfd0c90e10caa4c7a24ed8d9200774b5"
   },
   {
    "path": "js/main.js",
@@ -33,7 +33,7 @@
   },
   {
    "path": "js/sync.js",
-   "sha256": "9167172dd992df59fbdfd764eb28828490f33e92aeace29db59970869d50aa86"
+   "sha256": "b01191c1d08b8861c09257a1d2bad3056201654464315775ae84d05689480b3c"
   },
   {
    "path": "js/updater.js",

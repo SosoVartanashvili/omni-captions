@@ -26,10 +26,14 @@
     return NUM[c] || c;
   }
 
+  // every script line is its own thought: its last word is marked eol (a caption never runs past it)
   function scriptTokens(text) {
-    return String(text).replace(/\r/g, '').split(/\s+/)
-      .filter(function (t) { return /[A-Za-z0-9]/.test(t); })
-      .map(function (t) { return { text: t, c: core(t) }; });
+    var out = [];
+    String(text).replace(/\r/g, '').split('\n').forEach(function (line) {
+      var toks = line.split(/\s+/).filter(function (t) { return /[A-Za-z0-9]/.test(t); });
+      toks.forEach(function (t, i) { out.push({ text: t, c: core(t), eol: i === toks.length - 1 }); });
+    });
+    return out;
   }
 
   // character-level similarity 0..1 (Dice on bigrams; cheap and good for mis-hearings)
@@ -75,7 +79,7 @@
     var t0 = start, out = [];
     scriptToks.forEach(function (t) {
       var d = (end - start) * (t.text.length + 1) / Math.max(1, total);
-      out.push({ text: t.text, start: t0, end: t0 + d, type: 'word', from: 'script' });
+      out.push({ text: t.text, start: t0, end: t0 + d, type: 'word', from: 'script', eol: !!t.eol });
       t0 += d;
     });
     return out;
@@ -117,7 +121,7 @@
       var s = p[0] >= 0 ? S[p[0]] : null, h = p[1] >= 0 ? H[p[1]] : null;
       if (s && h && s.c === h.c) {
         flush();
-        out.push({ text: s.text, start: h.start, end: h.end, type: 'word', from: 'script' });
+        out.push({ text: s.text, start: h.start, end: h.end, type: 'word', from: 'script', eol: !!s.eol });
         stats.matched++;
       } else {
         if (s) bs.push(s);

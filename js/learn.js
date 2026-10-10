@@ -33,7 +33,7 @@
     eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
   var TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
   var SCALE = { hundred: 100, thousand: 1000, million: 1000000 };
-  var COUNTED = /^(gumm(y|ies)|scoops?|servings?|grams?|g|mg|kg|pounds?|lbs?|days?|weeks?|months?|years?|hours?|minutes?|seconds?|times?|bags?|packs?|bottles?|jars?|stars?|percent|dollars?|bucks|kids?|sizes?|inch(es)?|reps?|sets?|glasses?|cups?|meals?|steps?|miles?|thing|reason|brand|ingredient)$/;
+  var COUNTED = /^(gumm(y|ies)|scoops?|servings?|grams?|g|mg|kg|pounds?|lbs?|days?|weeks?|months?|years?|hours?|minutes?|seconds?|times?|bags?|packs?|bottles?|jars?|stars?|percent|dollars?|bucks|kids?|sizes?|inch(es)?|reps?|sets?|glasses?|cups?|meals?|steps?|miles?)$/;
 
   function numWord(t) {
     var c = core(t);
@@ -75,7 +75,7 @@
       if (core(nextC) === 'percent' && !post) {                      // "fifty percent" -> "50%"
         var pw = words[j]; txt += '%'; post = splitPunct(pw.text).post; endT = pw.end; j++;
       }
-      out.push({ text: fp.pre + txt + post, start: first.start, end: endT, type: 'word' });
+      out.push({ text: fp.pre + txt + post, start: first.start, end: endT, type: 'word', eol: !!words[j - 1].eol });
       i = j;
     }
     // digits followed by the word "percent" -> "50%"
@@ -83,7 +83,7 @@
     out.forEach(function (w) {
       var prev = res[res.length - 1];
       if (prev && /^\d[\d,.]*$/.test(prev.text) && core(w.text) === 'percent') {
-        prev.text += '%' + splitPunct(w.text).post; prev.end = w.end; return;
+        prev.text += '%' + splitPunct(w.text).post; prev.end = w.end; prev.eol = prev.eol || w.eol; return;
       }
       res.push(w);
     });
@@ -127,7 +127,7 @@
         var txt = t;
         if (k === 0) txt = first.pre + txt;
         if (k === toks.length - 1 && !/[.,!?;:]$/.test(txt)) txt = txt + last.post;
-        out.push({ text: txt, start: s0 + k * step, end: s0 + (k + 1) * step, type: 'word' });
+        out.push({ text: txt, start: s0 + k * step, end: s0 + (k + 1) * step, type: 'word', eol: k === toks.length - 1 && !!hit.seg[hit.n - 1].eol });
       });
       i += hit.n;
     }

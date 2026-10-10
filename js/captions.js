@@ -44,7 +44,8 @@
   var CHUNK_START = toSet('and but so or nor because cause cuz that which who whom whose when where while if then than unless until though although since after before as like ' +
     'to of in on at for from with without by about into onto over under through between during against among across behind beyond near ' +
     'is are was were be been being am can could will would shall should may might must do does did have has had ' +
-    'i you he she we they it there here this these those what how why out now today every');
+    'i you he she we they it there here this these those what how why out now today every ' +
+    'a an the my your his her our their its some any no');
   // words that belong to the word after them (never end a line / caption on them)
   var GLUE_NEXT = toSet('a an the my your his her our their its this these those some any no every either neither ' +
     'very so too such what which whose ' +
@@ -71,7 +72,7 @@
       if (!t) return;
       var s = +w.start, e = +w.end;
       if (!(e >= s)) e = s;
-      out.push({ text: t, start: s, end: e });
+      out.push({ text: t, start: s, end: e, eol: !!w.eol });
     });
     out.sort(function (a, b) { return a.start - b.start; });
     return out;
@@ -99,7 +100,7 @@
   function layoutCost(ws, o) {
     if (ws.length === 1 || joinText(ws).length <= o.maxChars) return 0;
     var best = Infinity;
-    for (var k = 1; k < ws.length; k++) {
+    for (var k = 1; k < ws.length - 1; k++) {                 // the 2nd line is never a single word
       if (joinText(ws.slice(0, k)).length > o.maxChars || joinText(ws.slice(k)).length > o.maxChars) continue;
       best = Math.min(best, breakScore(ws, k, false));
     }
@@ -111,7 +112,7 @@
     if (ws.length === 1 || text.length <= o.maxChars) return [text];
     if (o.maxLines < 2) return null;
     var best = null, bestScore = Infinity;
-    for (var k = 1; k < ws.length; k++) {
+    for (var k = 1; k < ws.length - 1; k++) {                 // the 2nd line is never a single word
       var a = joinText(ws.slice(0, k)), b = joinText(ws.slice(k));
       if (a.length > o.maxChars || b.length > o.maxChars) continue;
       var s = breakScore(ws, k, false);
@@ -122,9 +123,9 @@
 
   // used only when a merge made a caption wider than the limits: best balanced break, no limit
   function forceLines(ws, o) {
-    if (o.maxLines < 2 || ws.length < 2) return [joinText(ws)];
+    if (o.maxLines < 2 || ws.length < 3) return [joinText(ws)];
     var best = 1, bs = Infinity;
-    for (var k = 1; k < ws.length; k++) { var sc = breakScore(ws, k, false); if (sc < bs) { bs = sc; best = k; } }
+    for (var k = 1; k < ws.length - 1; k++) { var sc = breakScore(ws, k, false); if (sc < bs) { bs = sc; best = k; } }
     return [joinText(ws.slice(0, best)), joinText(ws.slice(best))];
   }
 
@@ -148,7 +149,8 @@
     else if (!GLUE_NEXT[p]) s += 1.2;                        // between two content words: "creatine | brands", "lean | muscle"
     if (GLUE_NEXT[p]) s += 1.0;                              // never end on "the", "of", "so", "many" …
     if (ARTICLE[p]) s += 1.5;
-    if (/^(and|but|or|nor|so|because|that|if|when|while)$/.test(p) && !SOFT_END.test(prev)) s += 1.2;   // never end on "and / but / because"                                 // and really never on "the / a / my / their" …
+    if (/^(and|but|or|nor|so|because|that|if|when|while)$/.test(p) && !SOFT_END.test(prev)) s += 1.2;
+    if (/^(must|can|could|will|would|should|might|may|do|does|did|am|is|are|was|were|be|been|has|have|had|i'm|you're|they're|we're|it's|he's|she's|that's|i've|you've|we've|they've|i'll|you'll|won't|can't|don't|doesn't|didn't)$/.test(p) && !CHUNK_START[n] && !SOFT_END.test(prev)) s += 0.9;   // "must | be safe", "they are | likely"    // never end on "and / but / because"                                 // and really never on "the / a / my / their" …
     if (/^\d/.test(next) && GLUE_NEXT[p]) s += 0.5;           // "the | 3 grams"
     if (/^[\d$]/.test(prev) && !SOFT_END.test(prev)) s += 0.8; // "3 | grams", "$67 | off"
     if (k === 1 || ws.length - k === 1) s += 0.8;            // no single word left alone
@@ -187,12 +189,40 @@
     for (var i = 1; i < words.length; i++) {
       var p = words[i - 1], w = words[i], why = null;
       if (w.shot !== p.shot) why = 'cut';
-      else if (SENT_END.test(p.text)) why = 'sentence';
+      else if (SENT_END.test(p.text) || p.eol) why = 'sentence';
       else if (w.start - p.end > o.gapBreak) why = 'gap';
       if (why) { phrases.push({ ws: cur, endWhy: why }); cur = [w]; }
       else cur.push(w);
     }
     phrases.push({ ws: cur, endWhy: 'end' });
+
+    // 1b. a cut that falls inside a phrase ("look for a brand that has | real people behind it"):
+    //     the caption still changes exactly on the cut, but the words may shift by up to 3 so the
+    //     split lands between phrases, not inside one ("look for a brand | that has real people…").
+    for (var pi = 0; pi < phrases.length - 1; pi++) {
+      var L0 = phrases[pi], R0 = phrases[pi + 1];
+      if (L0.endWhy !== 'cut') continue;
+      if (SENT_END.test(L0.ws[L0.ws.length - 1].text) || L0.ws[L0.ws.length - 1].eol) continue;   // cut on a sentence end: nothing to fix
+      var all = L0.ws.concat(R0.ws), base = L0.ws.length, cutT = cuts[R0.ws[0].shot - 1];
+      var bestK = base, bestS = breakScore(all, base, false);
+      for (var k2 = Math.max(1, base - 3); k2 <= Math.min(all.length - 1, base + 3); k2++) {
+        if (k2 === base) continue;
+        if (k2 < base && all[k2].end < cutT - 0.6) continue;          // words moving right must touch the cut
+        if (k2 > base && all[k2 - 1].start > cutT + 0.6) continue;    // words moving left must touch the cut
+        // never move words across a sentence end
+        var sentInside = false, qa = k2 < base ? k2 : base - 1, qb = k2 < base ? base - 1 : k2 - 2;
+        for (var q2 = qa; q2 <= qb; q2++) if (SENT_END.test(all[q2].text) || all[q2].eol) sentInside = true;
+        if (sentInside) continue;
+        var sc2 = breakScore(all, k2, false) + 0.35 * Math.abs(k2 - base);
+        if (sc2 < bestS - 0.2) { bestS = sc2; bestK = k2; }
+      }
+      if (bestK !== base) {
+        var ls = L0.ws[0].shot, rs = R0.ws[0].shot;
+        L0.ws = all.slice(0, bestK); R0.ws = all.slice(bestK);
+        L0.ws.forEach(function (w) { w.shot = ls; });
+        R0.ws.forEach(function (w) { w.shot = rs; });
+      }
+    }
 
     // 2. split every phrase to size
     var caps = [];
@@ -242,7 +272,7 @@
       var cr = caps[r], nr = caps[r + 1], pr = caps[r - 1];
       if (cr.end - cr.start >= o.minDur) continue;
       var sameN = nr && nr.shot === cr.shot, sameP = pr && pr.shot === cr.shot;
-      var maxEnd = sameN ? Math.max(nr.start, nr.end - o.minDur) : Math.min(shotEnd(cr.shot), nr ? nr.start : Infinity);
+      var maxEnd = Math.min(shotEnd(cr.shot), sameN ? Math.max(nr.start, nr.end - o.minDur) : (nr ? nr.start : Infinity));
       var newEnd = Math.min(cr.start + o.minDur, maxEnd);
       if (newEnd > cr.end) { cr.end = newEnd; if (sameN && nr.start < cr.end) nr.start = cr.end; }
       if (cr.end - cr.start < o.minDur) {
@@ -297,6 +327,13 @@
       }
     }
 
+    // final safety: every caption inside its own shot
+    caps.forEach(function (c) {
+      var a4 = shotStart(c.shot), b4 = shotEnd(c.shot);
+      c.start = Math.min(Math.max(c.start, a4), b4 - frame);
+      c.end = Math.max(Math.min(c.end, b4), c.start + frame);
+    });
+
     caps.forEach(function (c) {
       c.start = Math.round(c.start / frame) * frame;
       c.end = Math.round(c.end / frame) * frame;
@@ -304,7 +341,15 @@
       c.lines = layout(c.words, o) || forceLines(c.words, o);
     });
     for (var m = 0; m < caps.length - 1; m++) if (caps[m].end > caps[m + 1].start) caps[m].end = caps[m + 1].start;
-    caps = caps.filter(function (c) { return c.end > c.start; });
+    // a caption squeezed to nothing never loses its words: they join the neighbour
+    for (var z = 0; z < caps.length; z++) {
+      if (caps[z].end > caps[z].start + 1e-9) continue;
+      var nbz = caps[z - 1] || caps[z + 1];
+      if (!nbz) { caps[z].end = caps[z].start + frame; continue; }
+      nbz.words = caps[z - 1] ? nbz.words.concat(caps[z].words) : caps[z].words.concat(nbz.words);
+      nbz.lines = layout(nbz.words, o) || forceLines(nbz.words, o);
+      caps.splice(z, 1); z--;
+    }
 
     // 7. text style
     caps.forEach(function (c) {
