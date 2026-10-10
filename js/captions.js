@@ -30,13 +30,25 @@
     orphanMax: 0.45,   // a lone word shorter than this at a shot's end moves to the next shot
     fillGap: 1.5,      // pauses up to this long are filled: no empty frames between captions (0 = off)
     upper: false,
-    stripEndPunct: false
+    stripEndPunct: false,
+    noDotsCommas: false  // remove every . , … from the captions (not inside numbers: 4.8, 2,000)
   };
 
   var SENT_END = /[.!?…]["'”’)\]]*$/;
   var SOFT_END = /[,;:—–]["'”’)\]]*$/;
   var CONJ = toSet('and but so or because cause cuz that when which who whose then if while until after before since like without though although unless where why how');
   var WEAK_AFTER = toSet('a an the to of my your his her our their its this these those i im i\'m in on at for from with by and but or is was are were be been very so as into onto than');
+
+  var ARTICLE = toSet('a an the my your his her our their its this these those every each no');
+  // a new caption / line may start well before these (they open a new chunk of meaning)
+  var CHUNK_START = toSet('and but so or nor because cause cuz that which who whom whose when where while if then than unless until though although since after before as like ' +
+    'to of in on at for from with without by about into onto over under through between during against among across behind beyond near ' +
+    'is are was were be been being am can could will would shall should may might must do does did have has had ' +
+    'i you he she we they it there here this these those what how why out now today every');
+  // words that belong to the word after them (never end a line / caption on them)
+  var GLUE_NEXT = toSet('a an the my your his her our their its this these those some any no every either neither ' +
+    'very so too such what which whose ' +
+    'to of in on at for from with by about into onto over under through between as than not just only even also really');
 
   function toSet(s) { var o = {}; s.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
   function bare(t) { return String(t).toLowerCase().replace(/[^a-z0-9']/g, ''); }
@@ -83,6 +95,17 @@
 
   function joinText(ws) { return ws.map(function (w) { return w.text; }).join(' '); }
 
+  // how good the best 2-line layout of these words is (0 = fits on one line)
+  function layoutCost(ws, o) {
+    if (ws.length === 1 || joinText(ws).length <= o.maxChars) return 0;
+    var best = Infinity;
+    for (var k = 1; k < ws.length; k++) {
+      if (joinText(ws.slice(0, k)).length > o.maxChars || joinText(ws.slice(k)).length > o.maxChars) continue;
+      best = Math.min(best, breakScore(ws, k, false));
+    }
+    return best === Infinity ? 3 : Math.max(0, best + 0.6);
+  }
+
   function layout(ws, o) {
     var text = joinText(ws);
     if (ws.length === 1 || text.length <= o.maxChars) return [text];
@@ -109,16 +132,27 @@
   function fits(ws, o) { return ws.length === 1 || (!!layout(ws, o) && dur(ws) <= o.maxDur); }
 
   // lower = better place to split between ws[k-1] and ws[k]
+  function isBrandPair(prev, next) {
+    var p = bare(prev), n = bare(next);
+    return (p === 'omni' && /^(creatine|electrolytes|electrolyte|gummies|gummy)$/.test(n)) ||
+           (p === 'creatine' && /^(gumm(y|ies)|electrolytes?)$/.test(n));
+  }
+
+  // lower = better place to split between ws[k-1] and ws[k]
   function breakScore(ws, k, useGap) {
     var la = joinText(ws.slice(0, k)).length, lb = joinText(ws.slice(k)).length;
-    var s = Math.abs(la - lb) / Math.max(1, la + lb);
-    var prev = ws[k - 1].text, next = ws[k].text;
-    if (SOFT_END.test(prev)) s -= 0.6;
-    if (CONJ[bare(next)]) s -= 0.3;
-    if (WEAK_AFTER[bare(prev)]) s += 0.5;
-    if (k === 1 || ws.length - k === 1) s += 0.8;
-    if (/^omni$/i.test(bare(prev)) && /^(creatine|electrolytes|gummies|gummy)$/.test(bare(next))) s += 2;   // keep the brand name whole
-    if (bare(prev) === 'creatine' && /^gumm(y|ies)$/.test(bare(next))) s += 2;
+    var s = Math.abs(la - lb) / Math.max(1, la + lb) * 0.6;
+    var prev = ws[k - 1].text, next = ws[k].text, p = bare(prev), n = bare(next);
+    if (SOFT_END.test(prev)) s -= 0.9;                       // after a comma / colon: best
+    else if (CHUNK_START[n] && !GLUE_NEXT[p]) s -= 0.4;      // before "of / that / are / because …"
+    else if (!GLUE_NEXT[p]) s += 1.2;                        // between two content words: "creatine | brands", "lean | muscle"
+    if (GLUE_NEXT[p]) s += 1.0;                              // never end on "the", "of", "so", "many" …
+    if (ARTICLE[p]) s += 1.5;
+    if (/^(and|but|or|nor|so|because|that|if|when|while)$/.test(p) && !SOFT_END.test(prev)) s += 1.2;   // never end on "and / but / because"                                 // and really never on "the / a / my / their" …
+    if (/^\d/.test(next) && GLUE_NEXT[p]) s += 0.5;           // "the | 3 grams"
+    if (/^[\d$]/.test(prev) && !SOFT_END.test(prev)) s += 0.8; // "3 | grams", "$67 | off"
+    if (k === 1 || ws.length - k === 1) s += 0.8;            // no single word left alone
+    if (isBrandPair(prev, next)) s += 10;                    // OMNI Creatine Gummies is never split
     if (useGap) s -= Math.min(Math.max(0, ws[k].start - ws[k - 1].end), 0.5) * 0.8;
     return s;
   }
@@ -130,6 +164,7 @@
       var s = breakScore(ws, k, true);
       if (!fits(ws.slice(0, k), o)) s += 0.3;
       if (!fits(ws.slice(k), o)) s += 0.3;
+      s += 0.7 * (layoutCost(ws.slice(0, k), o) + layoutCost(ws.slice(k), o));   // both halves must also break into good lines
       if (s < bestScore) { bestScore = s; best = k; }
     }
     return splitToFit(ws.slice(0, best), o).concat(splitToFit(ws.slice(best), o));
@@ -274,6 +309,9 @@
     // 7. text style
     caps.forEach(function (c) {
       var lines = c.lines.slice();
+      if (o.noDotsCommas) lines = lines.map(function (l) {
+        return l.replace(/(?<!\d)[.,]|[.,](?!\d)|\u2026/g, '').replace(/\s{2,}/g, ' ').trim();
+      });
       if (o.stripEndPunct) lines[lines.length - 1] = lines[lines.length - 1].replace(/[.,;:]+(["'”’)\]]*)$/, '$1');
       if (o.upper) lines = lines.map(function (l) { return l.toUpperCase(); });
       c.text = lines.join('\n');
@@ -305,7 +343,7 @@
     }).join('\n');
   }
 
-  var api = { build: build, toSRT: toSRT, DEFAULTS: DEFAULTS, _normCuts: normCuts };
+  var api = { build: build, toSRT: toSRT, DEFAULTS: DEFAULTS, _normCuts: normCuts, _dbg: { breakScore: breakScore, layoutCost: layoutCost, merge: merge, layout: layout } };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OmniCaptions = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -6,7 +6,19 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var UPDATE_BASE = 'https://raw.githubusercontent.com/SosoVartanashvili/omni-captions/main';
-  var KEYS = ['notionToken', 'notionUrl', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'preset', 'rulesDir'];
+  var PRESETS = {
+    'basic-ugc': {
+      name: 'Basic (UGC) non background',
+      text: 'Proxima Nova Semibold · 60 · centred · bottom-centre zone · fill white · stroke black 6.5 px centre · no background · no shadow',
+      rules: { maxChars: 24, maxLines: 2 }
+    }
+  };
+  function applyPreset(setRules) {
+    var p = PRESETS[$('stylePreset').value] || PRESETS['basic-ugc'];
+    $('styleInfo').textContent = p.text;
+    if (setRules) { $('maxChars').value = p.rules.maxChars; $('maxLines').value = p.rules.maxLines; }
+  }
+  var KEYS = ['stylePreset', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'noDotsCommas', 'preset', 'rulesDir'];
 
   /* ---------- settings ---------- */
   function load() {
@@ -33,20 +45,11 @@
     return {
       maxChars: parseInt(s.maxChars, 10) || 24, maxLines: parseInt(s.maxLines, 10) || 2,
       minDur: parseFloat(s.minDur) || 0.7, maxDur: parseFloat(s.maxDur) || 6,
-      upper: !!s.upper, stripEndPunct: !!s.stripEndPunct,
+      upper: !!s.upper, stripEndPunct: !!s.stripEndPunct, noDotsCommas: !!s.noDotsCommas,
       fillGap: s.fillGap === '' || s.fillGap === undefined ? 1.5 : (parseFloat(s.fillGap) || 0)
     };
   }
   function toggleScript() { $('scriptBox').style.display = $('mode').value === 'transcribe' ? 'none' : 'block'; }
-  function loadNotion() {
-    var s = save();
-    status('Reading the Notion page…');
-    window.OmniNotion.readPage(s.notionUrl, s.notionToken).then(function (text) {
-      if (!text.trim()) throw new Error('The Notion page has no text.');
-      $('script').value = text; save();
-      status('Script loaded from Notion (' + text.split(/\s+/).length + ' words). Notes and unused hooks can stay — they are skipped.', 'ok');
-    }).catch(function (e) { status(e.message || String(e), 'err'); });
-  }
 
   /* ---------- UI ---------- */
   function status(msg, kind) { var el = $('status'); el.textContent = msg; el.className = 'status ' + (kind || ''); }
@@ -212,28 +215,6 @@
     });
   }
 
-  /* script.txt — Claude reads the Notion task (Notion MCP) and drops the script next to the project:
-     <project folder>/OMNI Captions/script.txt. A newer file than the last one loaded is picked up
-     automatically on Transcribe / Rebuild; the "script.txt" button loads it on demand. */
-  function scriptFile(info) { return pathMod.join(workDir(info), 'script.txt'); }
-  function pickUpScriptFile(info, force) {
-    var f = scriptFile(info);
-    if (!fs.existsSync(f)) { if (force) throw new Error('No script.txt yet in ' + workDir(info) + ' — send the Notion link to Claude.'); return false; }
-    var mt = String(fs.statSync(f).mtimeMs), key = 'omniScriptMtime:' + f, seen = null;
-    try { seen = localStorage.getItem(key); } catch (e) {}
-    if (!force && seen === mt) return false;
-    $('script').value = fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, '');
-    try { localStorage.setItem(key, mt); } catch (e) {}
-    save();
-    return true;
-  }
-  function loadScriptFile() {
-    jsx('omni_seqInfo', ['all']).then(function (info) {
-      pickUpScriptFile(info, true);
-      status('Script loaded from script.txt (' + $('script').value.split(/\s+/).length + ' words).', 'ok');
-    }).catch(function (e) { status(e.message || String(e), 'err'); });
-  }
-
   function run() {
     var s = save(), info, tmpWav = null;
     if (!s.apiKey) return status('Paste your ElevenLabs API key in Settings first.', 'err');
@@ -241,7 +222,6 @@
     status('Reading the sequence…');
     jsx('omni_seqInfo', [s.tracks || 'all']).then(function (i) {
       info = i;
-      pickUpScriptFile(info, false);
       if (s.mode === 'align' && !$('script').value.trim()) {
         throw new Error('"Align my script" needs a script — or switch Source to Transcribe.');
       }
@@ -276,7 +256,6 @@
     var s = save();
     busy(true);
     jsx('omni_seqInfo', [s.tracks || 'all']).then(function (info) {
-      pickUpScriptFile(info, false);
       var f = wordsFile(info);
       if (!fs.existsSync(f)) throw new Error('No saved transcript for this sequence yet — run "Transcribe & caption" once.');
       var words = JSON.parse(fs.readFileSync(f, 'utf8')).words;
@@ -292,8 +271,9 @@
     $('rebuild').onclick = rebuild;
     $('pickPreset').onclick = pickPreset;
     $('learn').onclick = learnFromSrt;
-    $('loadNotion').onclick = loadNotion;
-    $('loadScriptFile').onclick = loadScriptFile;
+    applyPreset(false);
+    $('stylePreset').addEventListener('change', function () { applyPreset(true); save(); });
+
     $('script').addEventListener('change', save);
     $('saveFixes').onclick = saveFixes;
     $('pickRules').onclick = function () {

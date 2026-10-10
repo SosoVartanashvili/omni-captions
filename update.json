@@ -1,11 +1,11 @@
 {
- "version": "1.3.3",
- "notes": "Paste script (anyone); Notion load admin only",
+ "version": "1.4.1",
+ "notes": "Option: remove all periods and commas",
  "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "d52c49b66bc103d41aeca62aa8a8bf51b4ea504ea6afefa0efb14b87654b6645"
+   "sha256": "4bf44c3801933651eaf30371ea8b72bd5e579099be419efd6243aa2819d34ff7"
   },
   {
    "path": "css/style.css",
@@ -13,11 +13,11 @@
   },
   {
    "path": "index.html",
-   "sha256": "6d044a7d551f72565b19a58927b6fb4fda004942702bad86c430277c45ac9349"
+   "sha256": "1506e0ee3f40fbb08da3022d5b60557d4a901af854cc0765d35080b4fa8cb1b1"
   },
   {
    "path": "js/captions.js",
-   "sha256": "49c4e54f73750234f97b5727ef6940b2a1bbd1a0c92f76eb1fc172792da0d9ab"
+   "sha256": "8b3d1786b15ff0c3aa371f7d0d90c356c18dec9d3195ba98e5e80ed591bc60b4"
   },
   {
    "path": "js/elevenlabs.js",
@@ -25,15 +25,11 @@
   },
   {
    "path": "js/learn.js",
-   "sha256": "c555fd6ffaba417138a9532808a35413a80669799ffd97cb91cb4c4ff2796348"
+   "sha256": "4a22f865b47d97dd1a956f1e05825a9afdaa1e281042447e0dad7bc815362ff1"
   },
   {
    "path": "js/main.js",
-   "sha256": "bc1a4e9ee18e5db5342017ee4f09ad77e029c973870dc9652178087c6502ebf5"
-  },
-  {
-   "path": "js/notion.js",
-   "sha256": "79dc16d0f050a581bb463b8232b750f16a871ff6dad0af6a474939b0e13c7f96"
+   "sha256": "a21c4e320e640f069dd6c5a0f510bea038720e9a575ecc59e7e9a4b8a2184dd0"
   },
   {
    "path": "js/sync.js",

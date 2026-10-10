@@ -29,6 +29,15 @@
   <div id="preview"></div>
 
   <details>
+    <summary>Caption style</summary>
+    <label>Preset<select id="stylePreset"><option value="basic-ugc">Basic (UGC) non background</option></select></label>
+    <div id="styleInfo" class="hint"></div>
+    <p class="hint">Premiere does not let panels set caption fonts, so the style is applied once per project:
+      select the new caption track › Essential Graphics › set the values above › Track Style › Create Style… › name it
+      "Basic (UGC) non background". After that, every new caption track: pick it in Track Style (one click).</p>
+  </details>
+
+  <details>
     <summary>Caption rules</summary>
     <div class="grid">
       <label>Max characters / line<input id="maxChars" type="number" min="8" max="60" value="24" title="Must fit your caption box. If Premiere shows a 3rd line, lower this."></label>
@@ -40,7 +49,8 @@
       <label>Language<select id="language"><option value="">Auto</option><option value="en">English</option><option value="es">Spanish</option></select></label>
     </div>
     <label class="check"><input id="upper" type="checkbox"> UPPERCASE</label>
-    <label class="check"><input id="stripEndPunct" type="checkbox"> Drop . , at the end of captions</label>
+    <label class="check"><input id="noDotsCommas" type="checkbox"> Remove all periods and commas</label>
+    <label class="check"><input id="stripEndPunct" type="checkbox"> Drop . , only at the end of captions</label>
   </details>
 
   <details>
@@ -53,14 +63,6 @@
     <div id="fixCount" class="hint"></div>
     <label>Shared learning folder (Google Drive / Dropbox) — same folder for the whole team</label>
     <div class="inline"><input id="rulesDir" type="text" placeholder="this computer only"><button id="pickRules" class="small">Choose…</button></div>
-  </details>
-
-  <details>
-    <summary>Notion — only for admin (Soso)</summary>
-    <p class="hint">Load the script straight from a Notion task. Needs Claude (script.txt) or a Notion token from the workspace owner.</p>
-    <div class="inline"><input id="notionUrl" type="text" placeholder="Notion task link"><button id="loadNotion" class="small">Load</button><button id="loadScriptFile" class="small" title="Load OMNI Captions/script.txt that Claude put next to the project">script.txt</button></div>
-    <label>Notion token (read-only integration)</label>
-    <div class="inline"><input id="notionToken" type="password" autocomplete="off"></div>
   </details>
 
   <details>
@@ -77,7 +79,6 @@
   <script src="js/captions.js"></script>
   <script src="js/learn.js"></script>
   <script src="js/sync.js"></script>
-  <script src="js/notion.js"></script>
   <script src="js/elevenlabs.js"></script>
   <script src="js/updater.js"></script>
   <script src="js/main.js"></script>
