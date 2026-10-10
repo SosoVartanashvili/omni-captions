@@ -1,0 +1,43 @@
+{
+ "version": "1.2.0",
+ "notes": "Self-update",
+ "restart": false,
+ "files": [
+  {
+   "path": "CSXS/manifest.xml",
+   "sha256": "29c1a6afa2620d81b1567006522207ac2dd50c7ca7eb14c5cbb425992cd630f9"
+  },
+  {
+   "path": "css/style.css",
+   "sha256": "f0d45445f6f2f8c7831af210b9b020f10413944461bb6c9e6d2f2b53e1eaa8d5"
+  },
+  {
+   "path": "index.html",
+   "sha256": "b870c72681fc4cd25048ba56efe2168d65a573ac664d097e6c9161eaab813c36"
+  },
+  {
+   "path": "js/captions.js",
+   "sha256": "032ef7ce3b0c171777851d04f23bd7751bb48a8c850a98d84278e0e20dc843c2"
+  },
+  {
+   "path": "js/elevenlabs.js",
+   "sha256": "ab80e236e23e815089f2a36628209a40756f8566c52166df5c0166b6a2885a1b"
+  },
+  {
+   "path": "js/learn.js",
+   "sha256": "c555fd6ffaba417138a9532808a35413a80669799ffd97cb91cb4c4ff2796348"
+  },
+  {
+   "path": "js/main.js",
+   "sha256": "ec03a47472338205defbeecfdb1025ae90ddd59f1f294465606b136184459d23"
+  },
+  {
+   "path": "js/updater.js",
+   "sha256": "359547728e08264dd2bed2042101c2ddd4eeedb8fca5c7de9e8294188615325d"
+  },
+  {
+   "path": "jsx/host.jsx",
+   "sha256": "5ccdadb4d93c762d992fb245a992130474a7fefb0a595798e789b2de6850075f"
+  }
+ ]
+}

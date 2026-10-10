@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>OMNI Captions</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <h1>OMNI Captions <span id="ver" class="ver"></span></h1>
+  <div id="updBar"><span id="updText"></span><button id="updBtn" class="primary">Update now</button></div>
+
+  <div class="row">
+    <label for="mode">Source</label>
+    <select id="mode">
+      <option value="transcribe">Transcribe (ElevenLabs Scribe)</option>
+      <option value="align">Align my script (exact text)</option>
+    </select>
+  </div>
+  <div id="scriptBox">
+    <textarea id="script" placeholder="Paste the VO / lyrics exactly as written. ElevenLabs only times it — the words stay yours."></textarea>
+  </div>
+
+  <button id="run" class="primary">Transcribe &amp; caption</button>
+  <button id="rebuild">Rebuild (new cuts / settings, no credits)</button>
+
+  <div id="status" class="status">Open a sequence, then press the button.</div>
+  <div id="preview"></div>
+
+  <details>
+    <summary>Caption rules</summary>
+    <div class="grid">
+      <label>Max characters / line<input id="maxChars" type="number" min="8" max="60" value="24" title="Must fit your caption box. If Premiere shows a 3rd line, lower this."></label>
+      <label>Lines<select id="maxLines"><option value="1">1</option><option value="2" selected>2</option></select></label>
+      <label>Min on screen (s)<input id="minDur" type="number" step="0.1" value="0.7"></label>
+      <label>Max on screen (s)<input id="maxDur" type="number" step="0.5" value="6"></label>
+      <label>Cut tracks<input id="tracks" type="text" value="all" title="Which video tracks define the cuts: all, or e.g. 1 or 1,2"></label>
+      <label>Language<select id="language"><option value="">Auto</option><option value="en">English</option><option value="es">Spanish</option></select></label>
+    </div>
+    <label class="check"><input id="upper" type="checkbox"> UPPERCASE</label>
+    <label class="check"><input id="stripEndPunct" type="checkbox"> Drop . , at the end of captions</label>
+  </details>
+
+  <details>
+    <summary>Learning</summary>
+    <p class="hint">Fix captions in Premiere, then select the caption track › File › Export › Captions… (.srt) and press Learn. Every word you corrected is applied automatically from then on. OMNI and OMNI Creatine Gummies are always capitalised.</p>
+    <button id="learn">Learn from my corrected captions…</button>
+    <label>Learned fixes (wrong => right) — edit freely</label>
+    <textarea id="fixes" spellcheck="false" placeholder="creating => creatine"></textarea>
+    <button id="saveFixes">Save fixes</button>
+    <div id="fixCount" class="hint"></div>
+    <label>Shared learning folder (Google Drive / Dropbox) — same folder for the whole team</label>
+    <div class="inline"><input id="rulesDir" type="text" placeholder="this computer only"><button id="pickRules" class="small">Choose…</button></div>
+  </details>
+
+  <details>
+    <summary>Settings</summary>
+    <label>ElevenLabs API key</label>
+    <div class="inline"><input id="apiKey" type="password" autocomplete="off"><button id="toggleKey" class="small">show</button></div>
+    <label>Audio export preset (.epr)</label>
+    <div class="inline"><input id="preset" type="text" placeholder="found automatically"><button id="pickPreset" class="small">Choose…</button></div>
+    <label>Update source (leave empty)</label>
+    <input id="updateUrl" type="text" placeholder="default">
+    <button id="checkUpd">Check for updates</button>
+  </details>
+
+  <script src="js/captions.js"></script>
+  <script src="js/learn.js"></script>
+  <script src="js/elevenlabs.js"></script>
+  <script src="js/updater.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

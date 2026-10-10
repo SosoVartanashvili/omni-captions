@@ -1,0 +1,285 @@
+/*
+ * OMNI Captions — the caption engine.
+ * Pure logic, no Premiere and no network: words + cut times in, captions out.
+ *
+ * Rules, in priority order:
+ *   1. A caption NEVER spans a cut. Its start and end stay inside one shot.
+ *   2. A sentence end (. ! ? …) always ends a caption. A pause longer than gapBreak does too.
+ *   3. A caption is never wider than maxChars per line / maxLines lines, never longer than maxDur.
+ *      When a phrase has to be split, it is split at the most natural point:
+ *      after a comma, before a conjunction, at a pause, balanced — never after "the", "a", "to"...
+ *   4. A short word left alone at the very end of a shot (the sentence carries on after the cut)
+ *      moves into the next shot's caption, so nothing flashes for 5 frames.
+ *   5. Timing is snapped: captions start ON the cut / end ON the cut when they are close to it,
+ *      tiny gaps between captions are closed, every caption is on screen at least minDur,
+ *      and every time is on the sequence's frame grid.
+ */
+(function (root) {
+  'use strict';
+
+  var DEFAULTS = {
+    maxChars: 24,      // per line — must fit the caption box of the style, or Premiere wraps to a 3rd line
+    maxLines: 2,       // 1 or 2
+    maxDur: 6.0,       // seconds
+    minDur: 0.7,       // seconds
+    gapBreak: 0.7,     // a pause longer than this always starts a new caption
+    linger: 0.15,      // caption stays this long after the last word
+    snapIn: 0.25,      // first word within this of the cut -> caption starts on the cut
+    snapOut: 0.3,      // caption end within this of the next cut -> it ends on the cut
+    closeGap: 0.25,    // gaps shorter than this between captions are closed
+    orphanMax: 0.45,   // a lone word shorter than this at a shot's end moves to the next shot
+    upper: false,
+    stripEndPunct: false
+  };
+
+  var SENT_END = /[.!?…]["'”’)\]]*$/;
+  var SOFT_END = /[,;:—–]["'”’)\]]*$/;
+  var CONJ = toSet('and but so or because cause cuz that when which who whose then if while until after before since like without though although unless where why how');
+  var WEAK_AFTER = toSet('a an the to of my your his her our their its this these those i im i\'m in on at for from with by and but or is was are were be been very so as into onto than');
+
+  function toSet(s) { var o = {}; s.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
+  function bare(t) { return String(t).toLowerCase().replace(/[^a-z0-9']/g, ''); }
+
+  function merge(opts) {
+    var o = {}, k;
+    for (k in DEFAULTS) o[k] = DEFAULTS[k];
+    for (k in (opts || {})) if (opts[k] !== undefined && opts[k] !== null && opts[k] !== '') o[k] = opts[k];
+    o.maxLines = Math.max(1, Math.min(2, parseInt(o.maxLines, 10) || 2));
+    return o;
+  }
+
+  /* ---------- input normalisation ---------- */
+
+  function normWords(raw) {
+    var out = [];
+    (raw || []).forEach(function (w) {
+      if (w.type && w.type !== 'word') return;           // Scribe: skip "spacing", "audio_event"
+      var t = String(w.text || '').replace(/\s+/g, ' ').trim();
+      if (!t) return;
+      var s = +w.start, e = +w.end;
+      if (!(e >= s)) e = s;
+      out.push({ text: t, start: s, end: e });
+    });
+    out.sort(function (a, b) { return a.start - b.start; });
+    return out;
+  }
+
+  function normCuts(cuts, frame, seqEnd) {
+    var tol = frame * 1.5;
+    var c = (cuts || []).map(Number).filter(function (t) { return isFinite(t) && t > tol && t < seqEnd - tol; });
+    c.sort(function (a, b) { return a - b; });
+    var out = [];
+    c.forEach(function (t) {
+      t = Math.round(t / frame) * frame;
+      if (!out.length || t - out[out.length - 1] > tol) out.push(t);
+    });
+    return out;
+  }
+
+  function shotOf(t, cuts) { var k = 0; while (k < cuts.length && cuts[k] <= t) k++; return k; }
+
+  /* ---------- text helpers ---------- */
+
+  function joinText(ws) { return ws.map(function (w) { return w.text; }).join(' '); }
+
+  function layout(ws, o) {
+    var text = joinText(ws);
+    if (ws.length === 1 || text.length <= o.maxChars) return [text];
+    if (o.maxLines < 2) return null;
+    var best = null, bestScore = Infinity;
+    for (var k = 1; k < ws.length; k++) {
+      var a = joinText(ws.slice(0, k)), b = joinText(ws.slice(k));
+      if (a.length > o.maxChars || b.length > o.maxChars) continue;
+      var s = breakScore(ws, k, false);
+      if (s < bestScore) { bestScore = s; best = [a, b]; }
+    }
+    return best;
+  }
+
+  // used only when a merge made a caption wider than the limits: best balanced break, no limit
+  function forceLines(ws, o) {
+    if (o.maxLines < 2 || ws.length < 2) return [joinText(ws)];
+    var best = 1, bs = Infinity;
+    for (var k = 1; k < ws.length; k++) { var sc = breakScore(ws, k, false); if (sc < bs) { bs = sc; best = k; } }
+    return [joinText(ws.slice(0, best)), joinText(ws.slice(best))];
+  }
+
+  function dur(ws) { return ws[ws.length - 1].end - ws[0].start; }
+  function fits(ws, o) { return ws.length === 1 || (!!layout(ws, o) && dur(ws) <= o.maxDur); }
+
+  // lower = better place to split between ws[k-1] and ws[k]
+  function breakScore(ws, k, useGap) {
+    var la = joinText(ws.slice(0, k)).length, lb = joinText(ws.slice(k)).length;
+    var s = Math.abs(la - lb) / Math.max(1, la + lb);
+    var prev = ws[k - 1].text, next = ws[k].text;
+    if (SOFT_END.test(prev)) s -= 0.6;
+    if (CONJ[bare(next)]) s -= 0.3;
+    if (WEAK_AFTER[bare(prev)]) s += 0.5;
+    if (k === 1 || ws.length - k === 1) s += 0.8;
+    if (/^omni$/i.test(bare(prev)) && /^(creatine|electrolytes|gummies|gummy)$/.test(bare(next))) s += 2;   // keep the brand name whole
+    if (bare(prev) === 'creatine' && /^gumm(y|ies)$/.test(bare(next))) s += 2;
+    if (useGap) s -= Math.min(Math.max(0, ws[k].start - ws[k - 1].end), 0.5) * 0.8;
+    return s;
+  }
+
+  function splitToFit(ws, o) {
+    if (fits(ws, o)) return [ws];
+    var best = 1, bestScore = Infinity;
+    for (var k = 1; k < ws.length; k++) {
+      var s = breakScore(ws, k, true);
+      if (!fits(ws.slice(0, k), o)) s += 0.3;
+      if (!fits(ws.slice(k), o)) s += 0.3;
+      if (s < bestScore) { bestScore = s; best = k; }
+    }
+    return splitToFit(ws.slice(0, best), o).concat(splitToFit(ws.slice(best), o));
+  }
+
+  /* ---------- main ---------- */
+
+  function build(rawWords, rawCuts, info, opts) {
+    var o = merge(opts);
+    var frame = (info && info.frame) || 1 / 25;
+    var words = normWords(rawWords);
+    if (!words.length) return [];
+    var seqEnd = Math.max((info && info.end) || 0, words[words.length - 1].end + 1);
+    var cuts = normCuts(rawCuts, frame, seqEnd);
+
+    words.forEach(function (w) { w.shot = shotOf((w.start + w.end) / 2, cuts); });
+
+    // 1. phrases: break on sentence end, long pause, or cut
+    var phrases = [], cur = [words[0]];
+    for (var i = 1; i < words.length; i++) {
+      var p = words[i - 1], w = words[i], why = null;
+      if (w.shot !== p.shot) why = 'cut';
+      else if (SENT_END.test(p.text)) why = 'sentence';
+      else if (w.start - p.end > o.gapBreak) why = 'gap';
+      if (why) { phrases.push({ ws: cur, endWhy: why }); cur = [w]; }
+      else cur.push(w);
+    }
+    phrases.push({ ws: cur, endWhy: 'end' });
+
+    // 2. split every phrase to size
+    var caps = [];
+    phrases.forEach(function (ph) {
+      splitToFit(ph.ws, o).forEach(function (ws) { caps.push({ words: ws, shot: ws[ws.length - 1].shot }); });
+    });
+
+    // 3. a lone short word left at the very end of a shot, mid-sentence ("... and | my back"),
+    //    moves into the next shot's caption so nothing flashes for a few frames
+    for (var j = 0; j < caps.length - 1; j++) {
+      var cj = caps[j], nj = caps[j + 1];
+      if (cj.words.length !== 1 || nj.shot === cj.shot) continue;
+      var lone = cj.words[0];
+      if (SENT_END.test(lone.text) || SOFT_END.test(lone.text)) continue;
+      if (lone.end - lone.start > o.orphanMax) continue;
+      if (nj.words[0].start - lone.end > o.gapBreak) continue;
+      lone.shot = nj.shot;
+      var redo = splitToFit([lone].concat(nj.words), o).map(function (ws) { return { words: ws, shot: nj.shot }; });
+      caps.splice.apply(caps, [j, 2].concat(redo));
+    }
+
+    // 4. timing
+    function shotStart(s) { return s === 0 ? 0 : cuts[s - 1]; }
+    function shotEnd(s) { return s < cuts.length ? cuts[s] : seqEnd; }
+
+    caps.forEach(function (c, idx) {
+      var a = shotStart(c.shot), b = shotEnd(c.shot);
+      var firstInShot = idx === 0 || caps[idx - 1].shot !== c.shot;
+      var lastInShot = idx === caps.length - 1 || caps[idx + 1].shot !== c.shot;
+      c.start = c.words[0].start;
+      c.end = c.words[c.words.length - 1].end + o.linger;
+      if (firstInShot && c.start - a < o.snapIn) c.start = a;
+      if (lastInShot && b - c.end < o.snapOut) c.end = b;
+      c.start = Math.max(c.start, a);
+      c.end = Math.min(c.end, b);
+    });
+    for (var q = 1; q < caps.length; q++) if (caps[q].start < caps[q - 1].start + frame) caps[q].start = caps[q - 1].start + frame;
+    for (var n = 0; n < caps.length; n++) {
+      var c = caps[n], nxt = caps[n + 1];
+      var limit = nxt ? Math.min(shotEnd(c.shot), nxt.start) : shotEnd(c.shot);
+      if (c.end > limit) c.end = limit;
+      if (nxt && nxt.shot === c.shot && nxt.start - c.end < o.closeGap) c.end = nxt.start;
+    }
+
+    // 5. minimum duration: borrow time from a neighbour in the same shot, never across a cut
+    for (var r = 0; r < caps.length; r++) {
+      var cr = caps[r], nr = caps[r + 1], pr = caps[r - 1];
+      if (cr.end - cr.start >= o.minDur) continue;
+      var sameN = nr && nr.shot === cr.shot, sameP = pr && pr.shot === cr.shot;
+      var maxEnd = sameN ? Math.max(nr.start, nr.end - o.minDur) : Math.min(shotEnd(cr.shot), nr ? nr.start : Infinity);
+      var newEnd = Math.min(cr.start + o.minDur, maxEnd);
+      if (newEnd > cr.end) { cr.end = newEnd; if (sameN && nr.start < cr.end) nr.start = cr.end; }
+      if (cr.end - cr.start < o.minDur) {
+        var minStart = Math.max(shotStart(cr.shot), pr ? (sameP ? Math.min(pr.end, pr.start + o.minDur) : pr.end) : 0);
+        var newStart = Math.max(cr.end - o.minDur, minStart);
+        if (newStart < cr.start) { cr.start = newStart; if (sameP && pr.end > cr.start) pr.end = cr.start; }
+      }
+      var floorDur = Math.min(o.minDur, 0.4);
+      if (cr.end - cr.start < floorDur) {
+        // 1) the pair has room for two readable captions -> share the time between them
+        // 2) it does not, and the merged text still fits -> merge (never gluing two sentences)
+        // 3) neither -> share anyway, so neither one flashes for a few frames
+        var nb = sameN ? nr : (sameP ? pr : null);
+        if (nb) {
+          var s0 = Math.min(cr.start, nb.start), e0 = Math.max(cr.end, nb.end), span = e0 - s0;
+          var first = nb === nr ? cr : pr, second = nb === nr ? nr : cr;
+          var canMerge = !SENT_END.test(first.words[first.words.length - 1].text) &&
+                         !!layout(first.words.concat(second.words), o);
+          if (span < 2 * floorDur && canMerge) {
+            second.words = first.words.concat(second.words); second.start = s0; second.end = e0;
+            caps.splice(caps.indexOf(first), 1); r = Math.max(-1, r - 2);
+            continue;
+          }
+          var pad = Math.min(floorDur, span * 0.35);
+          var mid = s0 + span * first.words.length / (first.words.length + second.words.length);
+          mid = Math.min(Math.max(mid, s0 + pad), e0 - pad);
+          first.start = s0; first.end = mid; second.start = mid; second.end = e0;
+        }
+      }
+    }
+
+    caps.forEach(function (c) {
+      c.start = Math.round(c.start / frame) * frame;
+      c.end = Math.round(c.end / frame) * frame;
+      if (c.end <= c.start) c.end = c.start + frame;
+      c.lines = layout(c.words, o) || forceLines(c.words, o);
+    });
+    for (var m = 0; m < caps.length - 1; m++) if (caps[m].end > caps[m + 1].start) caps[m].end = caps[m + 1].start;
+    caps = caps.filter(function (c) { return c.end > c.start; });
+
+    // 6. text style
+    caps.forEach(function (c) {
+      var lines = c.lines.slice();
+      if (o.stripEndPunct) lines[lines.length - 1] = lines[lines.length - 1].replace(/[.,;:]+(["'”’)\]]*)$/, '$1');
+      if (o.upper) lines = lines.map(function (l) { return l.toUpperCase(); });
+      c.text = lines.join('\n');
+    });
+
+    return caps.map(function (c) {
+      return { start: c.start, end: c.end, text: c.text, shot: c.shot };
+    });
+  }
+
+  function ts(t) {
+    var ms = Math.max(0, Math.round(t * 1000));
+    var h = Math.floor(ms / 3600000); ms -= h * 3600000;
+    var m = Math.floor(ms / 60000); ms -= m * 60000;
+    var s = Math.floor(ms / 1000); ms -= s * 1000;
+    function p(n, l) { n = String(n); while (n.length < l) n = '0' + n; return n; }
+    return p(h, 2) + ':' + p(m, 2) + ':' + p(s, 2) + ',' + p(ms, 3);
+  }
+
+  // start rounded UP and end rounded DOWN to the millisecond, so Premiere's own frame
+  // conversion can never pull a caption a frame across the cut it was snapped to
+  function toSRT(caps) {
+    return caps.map(function (c, i) {
+      var a = Math.ceil(c.start * 1000 - 1e-6) / 1000, b = Math.floor(c.end * 1000 + 1e-6) / 1000;
+      if (b <= a) b = a + 0.001;
+      return (i + 1) + '\n' + ts(a) + ' --> ' + ts(b) + '\n' + c.text + '\n';
+    }).join('\n');
+  }
+
+  var api = { build: build, toSRT: toSRT, DEFAULTS: DEFAULTS, _normCuts: normCuts };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.OmniCaptions = api;
+})(typeof window !== 'undefined' ? window : this);
