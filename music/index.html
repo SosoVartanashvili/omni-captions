@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Soso Music</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <h1>Soso Music <span id="ver" class="ver"></span></h1>
+  <div id="updBar"><span id="updText"></span><button id="updBtn" class="primary">Update now</button></div>
+
+  <div class="row">
+    <label for="source">Make the music from</label>
+    <select id="source">
+      <option value="video">The video — AI watches it and scores the vibe (Video to Music)</option>
+      <option value="text">My description only (text to music)</option>
+    </select>
+  </div>
+  <div class="row">
+    <label for="range">Length</label>
+    <select id="range">
+      <option value="auto">In → Out if set, otherwise the whole sequence</option>
+      <option value="seq">Whole sequence</option>
+      <option value="inout">In → Out only</option>
+    </select>
+  </div>
+  <div id="len" class="len">—</div>
+  <button id="refresh" class="small" style="width:auto;margin:2px 0 0">Re-read the timeline</button>
+
+  <label for="style">Style</label>
+  <select id="style">
+    <option value="auto">Let the AI decide from the video</option>
+    <option value="ugc-pop">Upbeat UGC pop</option>
+    <option value="emotional">Emotional piano / strings</option>
+    <option value="lofi">Lo-fi chill</option>
+    <option value="hiphop">Hip-hop beat</option>
+    <option value="cinematic">Cinematic drama / tension</option>
+    <option value="quirky">Funny / quirky</option>
+    <option value="spooky">Spooky Halloween</option>
+    <option value="inspiring">Inspiring corporate / motivational</option>
+    <option value="custom">Only my description</option>
+  </select>
+  <label for="prompt">Describe the music (optional — mood, tempo, instruments, changes)</label>
+  <textarea id="prompt" placeholder="e.g. sad and slow at the start, turns hopeful and bouncy in the second half, ends on a happy note"></textarea>
+  <label class="check"><input id="instrumental" type="checkbox" checked> Instrumental only (no singing)</label>
+  <label class="check"><input id="cleanEnd" type="checkbox" checked> Clear ending exactly at the end (no long fade)</label>
+  <p id="srcHint" class="hint"></p>
+
+  <button id="run" class="primary">Generate music</button>
+  <div id="status" class="status">Open a sequence, then press the button.</div>
+  <div id="history"></div>
+
+  <details>
+    <summary>Placement</summary>
+    <div class="grid">
+      <label>Music volume (dB)<input id="db" type="number" step="1" value="-15" title="Level set on the placed clip. 0 = unchanged."></label>
+      <label>Model<select id="model">
+        <option value="music_v1">music_v1</option>
+        <option value="music_v2">music_v2</option>
+        <option value="music_v2_5">music_v2_5</option>
+      </select></label>
+    </div>
+    <p class="hint">The track goes on the first audio track that is empty for the whole length (a new track is added if all are busy), starting at the In point / start of the sequence. Every press makes a new version on its own track — mute the ones you don't want. Files are saved next to the project in "Soso Music".</p>
+  </details>
+
+  <details>
+    <summary>Settings</summary>
+    <label>ElevenLabs API key (the same one as Soso Captions)</label>
+    <div class="inline"><input id="apiKey" type="password" autocomplete="off"><button id="toggleKey" class="small">show</button></div>
+    <label>Video export preset for Video to Music (.epr, H.264)</label>
+    <div class="inline"><input id="vpreset" type="text" placeholder="found automatically"><button id="pickVPreset" class="small">Choose…</button></div>
+    <label>Update source (leave empty)</label>
+    <input id="updateUrl" type="text" placeholder="default">
+    <button id="checkUpd">Check for updates</button>
+  </details>
+
+  <script src="js/music.js"></script>
+  <script src="js/updater.js"></script>
+  <script src="js/access.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

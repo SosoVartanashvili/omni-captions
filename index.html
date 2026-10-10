@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Soso Captions</title>
+  <title>Avto MAGARI KLEXAR</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>Soso Captions <span id="ver" class="ver"></span></h1>
+  <h1>Avto MAGARI KLEXAR <span id="ver" class="ver"></span></h1>
   <div id="updBar"><span id="updText"></span><button id="updBtn" class="primary">Update now</button></div>
 
   <div class="row">
@@ -67,6 +67,8 @@
 
   <details>
     <summary>Settings</summary>
+    <label>Your name (shown to Soso in the devices list)</label>
+    <input id="editorName" type="text" placeholder="e.g. Nika">
     <label>ElevenLabs API key</label>
     <div class="inline"><input id="apiKey" type="password" autocomplete="off"><button id="toggleKey" class="small">show</button></div>
     <label>Audio export preset (.epr)</label>
@@ -74,6 +76,16 @@
     <label>Update source (leave empty)</label>
     <input id="updateUrl" type="text" placeholder="default">
     <button id="checkUpd">Check for updates</button>
+    <div id="deviceInfo" class="hint"></div>
+  </details>
+
+  <details id="adminBox" style="display:none">
+    <summary>Devices (admin)</summary>
+    <p class="hint">Every computer that opened a Soso panel with the shared learning folder set. Block / Unblock writes
+      <b>access.json</b>; upload it to the root of the GitHub repo and the change reaches every panel the next time it opens.</p>
+    <button id="refreshDevices" class="small" style="width:auto;margin:0 0 6px">Refresh</button>
+    <div id="devices"></div>
+    <div id="accessPath" class="hint"></div>
   </details>
 
   <script src="js/captions.js"></script>
@@ -81,6 +93,7 @@
   <script src="js/sync.js"></script>
   <script src="js/elevenlabs.js"></script>
   <script src="js/updater.js"></script>
+  <script src="js/access.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

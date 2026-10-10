@@ -1,0 +1,51 @@
+{
+ "version": "1.2.0",
+ "notes": "Reads the new EDIT TABLE format, #Nb extra clips, HOOK-B files, alternates",
+ "restart": false,
+ "files": [
+  {
+   "path": "CSXS/manifest.xml",
+   "sha256": "5e052396edfc71862424a7c2cd9708f9ec10a14e000d1d888ea88146c448d999"
+  },
+  {
+   "path": "css/style.css",
+   "sha256": "23263b43508cc12883a50e46ebb2c9cf8da3031aaa7b50157662f523cc572b57"
+  },
+  {
+   "path": "index.html",
+   "sha256": "0d2e643512fbf6b0c7cd7d3bd51f37bce316877ef7cd2922585121229b90608d"
+  },
+  {
+   "path": "js/access.js",
+   "sha256": "df85b3ec817cebb53221bb4eb6e34897204362b09be41f2b89b028f864c75567"
+  },
+  {
+   "path": "js/analyze.js",
+   "sha256": "1d2ca4f86b2e14147b4af1bdadd143985928406615245d55d30374ac89a95726"
+  },
+  {
+   "path": "js/beat.js",
+   "sha256": "4b3e1868d9ebc22c241fd1c95362e33555c7c7a134ed02f9a9235eab829fe005"
+  },
+  {
+   "path": "js/elevenlabs.js",
+   "sha256": "ab80e236e23e815089f2a36628209a40756f8566c52166df5c0166b6a2885a1b"
+  },
+  {
+   "path": "js/main.js",
+   "sha256": "9b759eb1a400c8a754bc86e09019fbd9874cdf210e5d0a46535983e7cfd042b5"
+  },
+  {
+   "path": "js/plan.js",
+   "sha256": "b97a25716cbf5109c7a7afa8f0db7ddb86562de45e68eecca089366785c54e93"
+  },
+  {
+   "path": "js/updater.js",
+   "sha256": "750ba79d46661855e9b627f75ef8053c86d8acc90bc087979d86c4656509c227"
+  },
+  {
+   "path": "jsx/host.jsx",
+   "sha256": "d93120ae140b6b0bb19f79d794d89862194dfc847b256d079692850eca19a508"
+  }
+ ]
+}

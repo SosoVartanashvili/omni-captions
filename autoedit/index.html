@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Soso Auto Edit</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <h1>Soso Auto Edit <span id="ver" class="ver"></span></h1>
+  <div id="updBar"><span id="updText"></span><button id="updBtn" class="primary">Update now</button></div>
+
+  <label>Project folder (clips + song + PROJECT notes)</label>
+  <div class="inline"><input id="folder" type="text" placeholder="E:\2026 projets\Creatine\#184-..."><button id="pickFolder" class="small">Choose…</button></div>
+  <div id="found" class="hint"></div>
+
+  <label for="song">Song</label>
+  <select id="song"></select>
+  <label for="timing">Lines + timing</label>
+  <select id="timing"></select>
+
+  <label class="check"><input id="hookSeqs" type="checkbox" checked> One sequence per hook (scene 1 / hook B / hook C …)</label>
+  <label class="check"><input id="precise" type="checkbox" checked> Exact line timing from the song (ElevenLabs)</label>
+  <label class="check"><input id="snap" type="checkbox" checked> Snap cuts to the beat</label>
+  <label class="check"><input id="trimFrozen" type="checkbox" checked> Trim frozen starts, avoid flash frames</label>
+  <label class="check"><input id="size1080" type="checkbox" checked> Sequence 1080×1920 (clips scaled to fill)</label>
+  <label class="check"><input id="muteClips" type="checkbox"> Mute the clips' own sound</label>
+
+  <button id="run" class="primary">Build the edit</button>
+  <div id="status" class="status">Choose the project folder.</div>
+  <div id="preview"></div>
+
+  <details>
+    <summary>Settings</summary>
+    <div class="grid">
+      <label>Cut offset (s)<input id="offset" type="number" step="0.02" value="0" title="Move every cut later (+) or earlier (-)"></label>
+      <label>Beat snap range (s)<input id="snapTol" type="number" step="0.02" value="0.12"></label>
+    </div>
+    <label>ElevenLabs API key (the same one as Soso Captions)</label>
+    <div class="inline"><input id="apiKey" type="password" autocomplete="off"><button id="toggleKey" class="small">show</button></div>
+    <label>Update source (leave empty)</label>
+    <input id="updateUrl" type="text" placeholder="default">
+    <button id="checkUpd">Check for updates</button>
+  </details>
+
+  <script src="js/plan.js"></script>
+  <script src="js/beat.js"></script>
+  <script src="js/analyze.js"></script>
+  <script src="js/elevenlabs.js"></script>
+  <script src="js/updater.js"></script>
+  <script src="js/access.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

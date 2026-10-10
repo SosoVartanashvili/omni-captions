@@ -1,0 +1,39 @@
+{
+ "version": "1.2.0",
+ "notes": "Devices list + access control",
+ "restart": false,
+ "files": [
+  {
+   "path": "CSXS/manifest.xml",
+   "sha256": "e185cc6710d7f2e62ee14a10775271633a725ff700fb2c39169495977925f790"
+  },
+  {
+   "path": "css/style.css",
+   "sha256": "23263b43508cc12883a50e46ebb2c9cf8da3031aaa7b50157662f523cc572b57"
+  },
+  {
+   "path": "index.html",
+   "sha256": "0ea2f5ccc82c97534b569ece403106b643337f55393e841060dc87b36db73a4b"
+  },
+  {
+   "path": "js/access.js",
+   "sha256": "df85b3ec817cebb53221bb4eb6e34897204362b09be41f2b89b028f864c75567"
+  },
+  {
+   "path": "js/main.js",
+   "sha256": "b3b691e160dab794eb34be09fb7510a98ab658760b294ee0d54f8778978946f6"
+  },
+  {
+   "path": "js/music.js",
+   "sha256": "cdf06486aa7479f09584019497a82c371abfcf9c8fd7bc48f9f7bbbd1bd3e2c5"
+  },
+  {
+   "path": "js/updater.js",
+   "sha256": "750ba79d46661855e9b627f75ef8053c86d8acc90bc087979d86c4656509c227"
+  },
+  {
+   "path": "jsx/host.jsx",
+   "sha256": "38bfa7ecd23353b7a2997e6523403ab7b056654c5170b17e0ecffb4c47696d51"
+  }
+ ]
+}

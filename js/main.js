@@ -18,7 +18,7 @@
     $('styleInfo').textContent = p.text;
     if (setRules) { $('maxChars').value = p.rules.maxChars; $('maxLines').value = p.rules.maxLines; }
   }
-  var KEYS = ['stylePreset', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'noDotsCommas', 'preset', 'rulesDir'];
+  var KEYS = ['editorName', 'stylePreset', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'noDotsCommas', 'preset', 'rulesDir'];
 
   /* ---------- settings ---------- */
   function load() {
@@ -126,6 +126,53 @@
         $('updText').textContent = 'Update failed — nothing was changed. ' + e.message;
         $('updBtn').disabled = false;
       });
+  }
+
+  /* ---------- devices: check-in, access, admin list ---------- */
+  function syncShared() {
+    var A = window.SosoAccess; if (!A) return;
+    A.setConfig({ sharedDir: ($('rulesDir').value || '').trim(), editorName: ($('editorName').value || '').trim() });
+    A.checkIn('Soso Captions', window.OmniUpdater.localVersion(), false);
+  }
+  function accessCheck() {
+    var A = window.SosoAccess; if (!A) return;
+    syncShared();
+    $('deviceInfo').textContent = 'This computer: ' + A.deviceId() + ' · ' + os.hostname();
+    A.check('Soso Captions', window.OmniUpdater.localVersion(), window.OmniUpdater._get).then(function (r) {
+      if (r.blocked) A.lockPanel(document, r);
+    }).catch(function () {});
+  }
+  function adminInit() {
+    var A = window.SosoAccess; if (!A) return;
+    var cfg = A.adminConfig(window.OmniUpdater.extensionDir());
+    if (!cfg || !cfg.accessJson) return;
+    $('adminBox').style.display = 'block';
+    $('accessPath').textContent = 'access.json: ' + cfg.accessJson;
+    function render() {
+      var access = A.readAccessFile(cfg.accessJson), list = A.listDevices(), box = $('devices');
+      box.innerHTML = '';
+      if (!list.length) { box.textContent = 'No devices yet. Editors appear here after they open a panel with the shared learning folder set.'; return; }
+      list.forEach(function (d) {
+        var blocked = !!A.isBlocked(access, d);
+        var row = document.createElement('div'); row.className = 'dev' + (blocked ? ' blocked' : '');
+        var who = document.createElement('div'); who.className = 'who';
+        who.textContent = (d.name || '(no name)') + ' — ' + d.computer + (blocked ? '  · BLOCKED' : '');
+        var meta = document.createElement('div'); meta.className = 'meta';
+        var panels = Object.keys(d.panels || {}).map(function (k) { return k.replace('Soso ', '') + ' ' + d.panels[k].version; }).join(', ');
+        meta.textContent = d.os + ' · ' + d.user + ' · ' + panels + ' · last seen ' + String(d.lastSeen).replace('T', ' ').slice(0, 16) +
+          (d.blockedSeen ? ' · tried while blocked ' + String(d.blockedSeen).replace('T', ' ').slice(0, 16) : '') + ' · id ' + d.id;
+        var b = document.createElement('button'); b.textContent = blocked ? 'Unblock' : 'Block'; b.className = blocked ? 'unblock' : '';
+        b.onclick = function () {
+          if (d.id === A.deviceId() && !blocked) { status('That is this computer — not blocking yourself.', 'err'); return; }
+          A.setBlocked(cfg.accessJson, d, !blocked);
+          render();
+          status((blocked ? 'Unblocked ' : 'Blocked ') + (d.name || d.computer) + '. Upload access.json to the root of the GitHub repo to apply it.', 'ok');
+        };
+        row.appendChild(who); row.appendChild(b); row.appendChild(meta); box.appendChild(row);
+      });
+    }
+    $('refreshDevices').onclick = render;
+    render();
   }
 
   /* ---------- the shared rules file (learned fixes) ---------- */
@@ -278,10 +325,14 @@
     $('saveFixes').onclick = saveFixes;
     $('pickRules').onclick = function () {
       var r = window.cep.fs.showOpenDialog(false, true, 'Pick the shared folder (e.g. a Google Drive / Dropbox folder)', '', []);
-      if (r && r.data && r.data[0]) { $('rulesDir').value = r.data[0]; save(); showFixes(); }
+      if (r && r.data && r.data[0]) { $('rulesDir').value = r.data[0]; save(); showFixes(); syncShared(); }
     };
     $('rulesDir').addEventListener('change', function () { showFixes(); });
     showFixes();
+    $('editorName').addEventListener('change', syncShared);
+    $('rulesDir').addEventListener('change', syncShared);
+    accessCheck();
+    adminInit();
     $('checkUpd').onclick = function () { checkUpdate(true); };
     setTimeout(function () { checkUpdate(false); }, 1200);
     $('mode').onchange = function () { toggleScript(); save(); };

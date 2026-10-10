@@ -1,19 +1,23 @@
 {
- "version": "1.4.4",
- "notes": "Years as 2025, number fixes, better phrase breaks",
+ "version": "1.5.0",
+ "notes": "Devices list + access control",
  "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "e5d0c1b5d7840d2c8067eaea3826f58089136f79b56ef119db1553ea9ac4657c"
+   "sha256": "96e6339981d5b68ecb2f88d9210a485dc7fc25cf1391657373b1ae628bd13e44"
   },
   {
    "path": "css/style.css",
-   "sha256": "f0d45445f6f2f8c7831af210b9b020f10413944461bb6c9e6d2f2b53e1eaa8d5"
+   "sha256": "a6dae0e3c9ea7d867d95b0705958bb9ec6541cf59a2e849e3e59b77076c0d81e"
   },
   {
    "path": "index.html",
-   "sha256": "1506e0ee3f40fbb08da3022d5b60557d4a901af854cc0765d35080b4fa8cb1b1"
+   "sha256": "2a788da4566a50836a42951607664967ba8e08e50b84d87ab59f689eba2f9300"
+  },
+  {
+   "path": "js/access.js",
+   "sha256": "df85b3ec817cebb53221bb4eb6e34897204362b09be41f2b89b028f864c75567"
   },
   {
    "path": "js/captions.js",
@@ -29,7 +33,7 @@
   },
   {
    "path": "js/main.js",
-   "sha256": "a21c4e320e640f069dd6c5a0f510bea038720e9a575ecc59e7e9a4b8a2184dd0"
+   "sha256": "690e8a3dc87bd53274a8adf4e6144c113e262a11f836ac273d4c3eb424f25a98"
   },
   {
    "path": "js/sync.js",
