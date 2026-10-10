@@ -36,7 +36,7 @@
           var j = null; try { j = JSON.parse(body); } catch (e) {}
           if (res.statusCode === 200 && j) return resolve(j);
           var msg = (j && j.message) || body.slice(0, 200);
-          if (res.statusCode === 404) msg = 'Page not found — in Notion, open the page (or its teamspace) › ••• › Connections and add the OMNI Captions integration.';
+          if (res.statusCode === 404) msg = 'Page not found — in Notion, open the page (or its teamspace) › ••• › Connections and add your Soso Captions integration.';
           if (res.statusCode === 401) msg = 'The Notion token is not valid.';
           reject(new Error('Notion ' + res.statusCode + ': ' + msg));
         });
