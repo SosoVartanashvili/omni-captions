@@ -28,6 +28,7 @@
     snapOut: 0.3,      // caption end within this of the next cut -> it ends on the cut
     closeGap: 0.25,    // gaps shorter than this between captions are closed
     orphanMax: 0.45,   // a lone word shorter than this at a shot's end moves to the next shot
+    fillGap: 1.5,      // pauses up to this long are filled: no empty frames between captions (0 = off)
     upper: false,
     stripEndPunct: false
   };
@@ -238,6 +239,29 @@
       }
     }
 
+    // 6. no gaps: a caption stays up until the next one starts (or until the cut, and the next shot's
+    //    first caption starts on the cut) — for pauses up to fillGap; never across a cut
+    var fill = +o.fillGap || 0;
+    if (fill > 0) {
+      for (var g = 0; g < caps.length; g++) {
+        var cg = caps[g], ng = caps[g + 1];
+        var b3 = shotEnd(cg.shot);
+        if (ng && ng.shot === cg.shot) {
+          if (ng.start > cg.end && ng.start - cg.end <= fill) cg.end = ng.start;
+        } else if (b3 > cg.end && b3 - cg.end <= fill) {
+          cg.end = b3;
+        }
+        if (ng && ng.shot !== cg.shot) {
+          var a3 = shotStart(ng.shot);
+          if (ng.start > a3 && ng.start - a3 <= fill && a3 >= cg.end) ng.start = a3;
+        }
+      }
+      if (caps.length) {
+        var c0 = caps[0], a0 = shotStart(c0.shot);
+        if (c0.start > a0 && c0.start - a0 <= fill && a0 > 0) c0.start = a0;
+      }
+    }
+
     caps.forEach(function (c) {
       c.start = Math.round(c.start / frame) * frame;
       c.end = Math.round(c.end / frame) * frame;
@@ -247,7 +271,7 @@
     for (var m = 0; m < caps.length - 1; m++) if (caps[m].end > caps[m + 1].start) caps[m].end = caps[m + 1].start;
     caps = caps.filter(function (c) { return c.end > c.start; });
 
-    // 6. text style
+    // 7. text style
     caps.forEach(function (c) {
       var lines = c.lines.slice();
       if (o.stripEndPunct) lines[lines.length - 1] = lines[lines.length - 1].replace(/[.,;:]+(["'”’)\]]*)$/, '$1');
@@ -274,6 +298,8 @@
   function toSRT(caps) {
     return caps.map(function (c, i) {
       var a = Math.ceil(c.start * 1000 - 1e-6) / 1000, b = Math.floor(c.end * 1000 + 1e-6) / 1000;
+      var nx = caps[i + 1];   // captions that touch share the exact same timestamp: no 1-frame gap
+      if (nx && Math.abs(nx.start - c.end) < 1e-6) b = Math.ceil(nx.start * 1000 - 1e-6) / 1000;
       if (b <= a) b = a + 0.001;
       return (i + 1) + '\n' + ts(a) + ' --> ' + ts(b) + '\n' + c.text + '\n';
     }).join('\n');

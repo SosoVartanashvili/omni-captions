@@ -6,13 +6,15 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var UPDATE_BASE = 'https://raw.githubusercontent.com/SosoVartanashvili/omni-captions/main';
-  var KEYS = ['updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'preset', 'rulesDir'];
+  var KEYS = ['notionToken', 'notionUrl', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'preset', 'rulesDir'];
 
   /* ---------- settings ---------- */
   function load() {
     var s = {};
     try { s = JSON.parse(localStorage.getItem('omniCaptions') || '{}'); } catch (e) {}
     if (s._v !== 2) { if (String(s.maxChars) === '32') s.maxChars = '24'; s._v = 2; }   // v1 default made 3-line captions
+    if (!s._v3) { if (!s.mode || s.mode === 'transcribe') s.mode = 'sync'; s._v3 = 1; }   // script matching is the new default
+    try { var sc = localStorage.getItem('omniCaptionsScript'); if (sc) $('script').value = sc; } catch (e) {}
     KEYS.forEach(function (k) {
       var el = $(k); if (!el || s[k] === undefined) return;
       if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k];
@@ -22,7 +24,8 @@
   function save() {
     var s = {};
     KEYS.forEach(function (k) { var el = $(k); if (el) s[k] = el.type === 'checkbox' ? el.checked : el.value; });
-    s._v = 2;
+    s._v = 2; s._v3 = 1;
+    try { localStorage.setItem('omniCaptionsScript', $('script').value || ''); } catch (e) {}
     try { localStorage.setItem('omniCaptions', JSON.stringify(s)); } catch (e) {}
     return s;
   }
@@ -30,10 +33,20 @@
     return {
       maxChars: parseInt(s.maxChars, 10) || 24, maxLines: parseInt(s.maxLines, 10) || 2,
       minDur: parseFloat(s.minDur) || 0.7, maxDur: parseFloat(s.maxDur) || 6,
-      upper: !!s.upper, stripEndPunct: !!s.stripEndPunct
+      upper: !!s.upper, stripEndPunct: !!s.stripEndPunct,
+      fillGap: s.fillGap === '' || s.fillGap === undefined ? 1.5 : (parseFloat(s.fillGap) || 0)
     };
   }
-  function toggleScript() { $('scriptBox').style.display = $('mode').value === 'align' ? 'block' : 'none'; }
+  function toggleScript() { $('scriptBox').style.display = $('mode').value === 'transcribe' ? 'none' : 'block'; }
+  function loadNotion() {
+    var s = save();
+    status('Reading the Notion page…');
+    window.OmniNotion.readPage(s.notionUrl, s.notionToken).then(function (text) {
+      if (!text.trim()) throw new Error('The Notion page has no text.');
+      $('script').value = text; save();
+      status('Script loaded from Notion (' + text.split(/\s+/).length + ' words). Notes and unused hooks can stay — they are skipped.', 'ok');
+    }).catch(function (e) { status(e.message || String(e), 'err'); });
+  }
 
   /* ---------- UI ---------- */
   function status(msg, kind) { var el = $('status'); el.textContent = msg; el.className = 'status ' + (kind || ''); }
@@ -164,7 +177,14 @@
 
   /* ---------- the two buttons ---------- */
   function finish(info, words, s) {
-    var rules = readRules();
+    var rules = readRules(), syncNote = '';
+    var script = ($('script').value || '').trim();
+    if (s.mode === 'sync' && script) {
+      var m = window.OmniSync.merge(words, script);
+      words = m.words;
+      syncNote = ' Script: ' + m.stats.matched + ' words matched, ' + m.stats.fixed + ' corrected from the script, ' +
+        m.stats.keptHeard + ' said but not in the script (kept), ' + m.stats.droppedScript + ' script words not in the audio (skipped).';
+    }
     var fixed = window.OmniLearn.applyFixes(words, rules.fixes);
     var caps = window.OmniCaptions.build(fixed, info.cuts, info, opts(s));
     if (!caps.length) throw new Error('No words found in the audio.');
@@ -187,14 +207,14 @@
         return;
       }
       status('Done — ' + caps.length + ' captions, fitted to ' + cuts.length + ' cuts (' + info.tracks + '). ' +
-        Object.keys(rules.fixes).length + ' learned fixes applied. Apply your caption style to the track.', 'ok');
+        Object.keys(rules.fixes).length + ' learned fixes applied.' + syncNote + ' Apply your caption style to the track.', 'ok');
     });
   }
 
   function run() {
     var s = save(), info, tmpWav = null;
     if (!s.apiKey) return status('Paste your ElevenLabs API key in Settings first.', 'err');
-    if (s.mode === 'align' && !$('script').value.trim()) return status('Paste the script (Align mode) or switch to Transcribe.', 'err');
+    if (s.mode !== 'transcribe' && !$('script').value.trim()) return status('Paste the script (or load it from Notion) — or switch Source to "Transcribe only".', 'err');
     busy(true);
     status('Reading the sequence…');
     jsx('omni_seqInfo', [s.tracks || 'all']).then(function (i) {
@@ -209,6 +229,7 @@
       return jsx('omni_exportAudio', [tmpWav, p.path]);
     }).then(function (a) {
       status((s.mode === 'align' ? 'Aligning the script' : 'Transcribing') + ' with ElevenLabs (' + Math.round(a.bytes / 1048576) + ' MB)…');
+      // sync mode = a normal transcription; the script is matched to it afterwards (and again on every Rebuild)
       var call = s.mode === 'align'
         ? window.OmniEleven.align(s.apiKey, a.path, $('script').value.trim())
         : window.OmniEleven.transcribe(s.apiKey, a.path, { language: s.language });
@@ -243,6 +264,8 @@
     $('rebuild').onclick = rebuild;
     $('pickPreset').onclick = pickPreset;
     $('learn').onclick = learnFromSrt;
+    $('loadNotion').onclick = loadNotion;
+    $('script').addEventListener('change', save);
     $('saveFixes').onclick = saveFixes;
     $('pickRules').onclick = function () {
       var r = window.cep.fs.showOpenDialog(false, true, 'Pick the shared folder (e.g. a Google Drive / Dropbox folder)', '', []);
