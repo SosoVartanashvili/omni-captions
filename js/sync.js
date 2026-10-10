@@ -130,7 +130,47 @@
 
   function strip(h) { return { text: h.text, start: h.start, end: h.end, type: 'word', from: 'heard' }; }
 
-  var api = { merge: merge, _core: core, _sim: sim };
+  /*
+   * Clean a pasted script before matching: drop what is never spoken in the video —
+   * section headings (HOOK 1, BODY, CTA, Verse, Chorus, Scene 3…), speaker / section labels in front
+   * of a line ("VO:", "HOOK 2:", "MOM:"), bullets and numbering, [bracketed] directions, editor notes,
+   * timecodes, links, emoji, markdown. Lines that are real sentences stay. The matcher afterwards
+   * still skips any script words that are not in the audio, so this only has to catch the obvious.
+   */
+  var LABEL = '(?:hook|hooks|body|cta|call to action|intro|outro|verse|chorus|pre[- ]?chorus|post[- ]?chorus|bridge|refrain|scene|shot|sc|vo|v\\.o\\.|voice ?over|voiceover|narrator|script|lyrics|song|variation|var|version|option|alt|alternative|line|part|section|ending|end card|opening|headline|title|angle|concept)';
+  var LABEL_LINE = new RegExp('^' + LABEL + '\\b[\\s#\\d.()\\-]*(?:\\b(?:variation|version|option|alt|alternative|[a-c]|v\\d+)\\b[\\s#\\d.()\\-]*)*:?$', 'i');
+  // "HOOK 2: …", "VO - …" (known labels, colon or dash) or an ALL-CAPS speaker of 1–2 words with a colon ("MOM: …")
+  var LABEL_PREFIX = new RegExp('^' + LABEL + '\\b[\\s#\\d.()]*(?:\\b(?:variation|version|option|alt|[a-c])\\b[\\s#\\d.()]*)*\\s*[:\\-–—]\\s+', 'i');
+  var SPEAKER_PREFIX = /^[A-Z][A-Z0-9'\-]{0,14}(?: [A-Z0-9'\-]{1,10})?\s*:\s+/;
+  var NOTE_LINE = /^(?:note|notes|nb|editor|editors?'? note|visual|visuals|b-?roll|sfx|music|text on screen|on-?screen( text)?|caption|captions|instructions?|reference|inspo|inspiration|duration|length|format|style|assets?|deadline|status|brief)\b.*$/i;
+
+  function cleanScript(text) {
+    var kept = [], removed = [];
+    String(text || '').replace(/\r/g, '').split('\n').forEach(function (raw) {
+      var line = raw
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')       // emoji
+        .replace(/https?:\/\/\S+/g, '')                                       // links
+        .replace(/\[[^\]]*\]/g, ' ')                                          // [directions], [Chorus]
+        .replace(/\b\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:\d{2})?\b/g, ' ')      // timecodes 0:03-0:05
+        .replace(/^\s*(?:[#>*\-•–—]+|\d{1,3}[.)]|[a-z][.)])\s+/i, '')        // bullets, numbering, markdown
+        .replace(/[*_`~]+/g, '')
+        .replace(/\s+/g, ' ').trim();
+      if (!line) { if (raw.trim()) removed.push(raw.trim()); return; }
+      if (/^\s*#{1,6}\s/.test(raw) ||                                                  // markdown / Notion heading
+          ((line.match(/\s[—–|\/]\s/g) || []).length >= 2 && !/[.!?]$/.test(line))) {   // "Video — Gummies — AI Song"
+        removed.push(raw.trim()); return;
+      }
+      if (LABEL_LINE.test(line) || NOTE_LINE.test(line) ||
+          (/:$/.test(line) && line.split(' ').length <= 6) ||                 // "Hook variation 2:"
+          !/[A-Za-z]/.test(line)) { removed.push(raw.trim()); return; }
+      var stripped = line.replace(LABEL_PREFIX, '').replace(SPEAKER_PREFIX, '');
+      if (stripped !== line) removed.push(line.slice(0, line.length - stripped.length).trim());
+      if (stripped) kept.push(stripped);
+    });
+    return { text: kept.join('\n'), removed: removed };
+  }
+
+  var api = { merge: merge, cleanScript: cleanScript, _core: core, _sim: sim };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OmniSync = api;
 })(typeof window !== 'undefined' ? window : this);

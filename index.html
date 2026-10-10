@@ -12,14 +12,14 @@
   <div class="row">
     <label for="mode">Source</label>
     <select id="mode">
-      <option value="sync">Transcribe + match my script (recommended)</option>
+      <option value="sync">Transcribe (+ match the pasted script)</option>
       <option value="transcribe">Transcribe only (no script)</option>
       <option value="align">Align my script (only if the audio follows it 100%)</option>
     </select>
   </div>
   <div id="scriptBox">
-    <div class="inline"><input id="notionUrl" type="text" placeholder="Notion task link (optional)"><button id="loadNotion" class="small">Load</button></div>
-    <textarea id="script" placeholder="Paste the script / lyrics — or load them from the Notion task. Labels, notes and unused hooks are fine: anything not sung or said is skipped, anything said that is not in the script is kept."></textarea>
+    <label>Script (optional) — paste it here</label>
+    <textarea id="script" placeholder="Paste the script or lyrics to get every word spelled exactly right. Titles, HOOK/BODY labels, notes, links and unused hooks are removed automatically. Leave empty to just transcribe."></textarea>
   </div>
 
   <button id="run" class="primary">Transcribe &amp; caption</button>
@@ -56,11 +56,17 @@
   </details>
 
   <details>
+    <summary>Notion — only for admin (Soso)</summary>
+    <p class="hint">Load the script straight from a Notion task. Needs Claude (script.txt) or a Notion token from the workspace owner.</p>
+    <div class="inline"><input id="notionUrl" type="text" placeholder="Notion task link"><button id="loadNotion" class="small">Load</button><button id="loadScriptFile" class="small" title="Load OMNI Captions/script.txt that Claude put next to the project">script.txt</button></div>
+    <label>Notion token (read-only integration)</label>
+    <div class="inline"><input id="notionToken" type="password" autocomplete="off"></div>
+  </details>
+
+  <details>
     <summary>Settings</summary>
     <label>ElevenLabs API key</label>
     <div class="inline"><input id="apiKey" type="password" autocomplete="off"><button id="toggleKey" class="small">show</button></div>
-    <label>Notion token (read-only integration)</label>
-    <div class="inline"><input id="notionToken" type="password" autocomplete="off"></div>
     <label>Audio export preset (.epr)</label>
     <div class="inline"><input id="preset" type="text" placeholder="found automatically"><button id="pickPreset" class="small">Choose…</button></div>
     <label>Update source (leave empty)</label>

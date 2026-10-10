@@ -1,11 +1,11 @@
 {
- "version": "1.3.1",
- "notes": "Soso Captions: script sync, Notion, no gaps",
- "restart": true,
+ "version": "1.3.3",
+ "notes": "Paste script (anyone); Notion load admin only",
+ "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "368fae3172c5a57fcf5e5aa6d9db5a5a97c9b69152dd25bbb39f40601b488c55"
+   "sha256": "d52c49b66bc103d41aeca62aa8a8bf51b4ea504ea6afefa0efb14b87654b6645"
   },
   {
    "path": "css/style.css",
@@ -13,7 +13,7 @@
   },
   {
    "path": "index.html",
-   "sha256": "3e824485b152507c8f7691221a0316161265d8eeeba19571e12b58b32d89e1d1"
+   "sha256": "6d044a7d551f72565b19a58927b6fb4fda004942702bad86c430277c45ac9349"
   },
   {
    "path": "js/captions.js",
@@ -29,7 +29,7 @@
   },
   {
    "path": "js/main.js",
-   "sha256": "9d23ebfaffa6f0e02de4197c8d7e5b0b1dd3dd1727c21872e71a62510d747d3b"
+   "sha256": "bc1a4e9ee18e5db5342017ee4f09ad77e029c973870dc9652178087c6502ebf5"
   },
   {
    "path": "js/notion.js",
@@ -37,7 +37,7 @@
   },
   {
    "path": "js/sync.js",
-   "sha256": "d78f7f03e15dd2759cc08d9dbf740b74dd8dc9be112c7e5293ff58d0d71d849b"
+   "sha256": "9167172dd992df59fbdfd764eb28828490f33e92aeace29db59970869d50aa86"
   },
   {
    "path": "js/updater.js",

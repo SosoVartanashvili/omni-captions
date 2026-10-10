@@ -180,9 +180,10 @@
     var rules = readRules(), syncNote = '';
     var script = ($('script').value || '').trim();
     if (s.mode === 'sync' && script) {
-      var m = window.OmniSync.merge(words, script);
+      var cl = window.OmniSync.cleanScript(script);
+      var m = window.OmniSync.merge(words, cl.text);
       words = m.words;
-      syncNote = ' Script: ' + m.stats.matched + ' words matched, ' + m.stats.fixed + ' corrected from the script, ' +
+      syncNote = ' Script: ' + cl.removed.length + ' heading/note lines removed, ' + m.stats.matched + ' words matched, ' + m.stats.fixed + ' corrected from the script, ' +
         m.stats.keptHeard + ' said but not in the script (kept), ' + m.stats.droppedScript + ' script words not in the audio (skipped).';
     }
     var fixed = window.OmniLearn.applyFixes(words, rules.fixes);
@@ -211,14 +212,40 @@
     });
   }
 
+  /* script.txt — Claude reads the Notion task (Notion MCP) and drops the script next to the project:
+     <project folder>/OMNI Captions/script.txt. A newer file than the last one loaded is picked up
+     automatically on Transcribe / Rebuild; the "script.txt" button loads it on demand. */
+  function scriptFile(info) { return pathMod.join(workDir(info), 'script.txt'); }
+  function pickUpScriptFile(info, force) {
+    var f = scriptFile(info);
+    if (!fs.existsSync(f)) { if (force) throw new Error('No script.txt yet in ' + workDir(info) + ' — send the Notion link to Claude.'); return false; }
+    var mt = String(fs.statSync(f).mtimeMs), key = 'omniScriptMtime:' + f, seen = null;
+    try { seen = localStorage.getItem(key); } catch (e) {}
+    if (!force && seen === mt) return false;
+    $('script').value = fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, '');
+    try { localStorage.setItem(key, mt); } catch (e) {}
+    save();
+    return true;
+  }
+  function loadScriptFile() {
+    jsx('omni_seqInfo', ['all']).then(function (info) {
+      pickUpScriptFile(info, true);
+      status('Script loaded from script.txt (' + $('script').value.split(/\s+/).length + ' words).', 'ok');
+    }).catch(function (e) { status(e.message || String(e), 'err'); });
+  }
+
   function run() {
     var s = save(), info, tmpWav = null;
     if (!s.apiKey) return status('Paste your ElevenLabs API key in Settings first.', 'err');
-    if (s.mode !== 'transcribe' && !$('script').value.trim()) return status('Paste the script (or load it from Notion) — or switch Source to "Transcribe only".', 'err');
     busy(true);
     status('Reading the sequence…');
     jsx('omni_seqInfo', [s.tracks || 'all']).then(function (i) {
       info = i;
+      pickUpScriptFile(info, false);
+      if (s.mode === 'align' && !$('script').value.trim()) {
+        throw new Error('"Align my script" needs a script — or switch Source to Transcribe.');
+      }
+      // sync mode with an empty script box = a plain transcription (the editors' normal case)
       if (s.preset && fs.existsSync(s.preset)) return { path: s.preset };
       return jsx('omni_findPreset');
     }).then(function (p) {
@@ -231,7 +258,7 @@
       status((s.mode === 'align' ? 'Aligning the script' : 'Transcribing') + ' with ElevenLabs (' + Math.round(a.bytes / 1048576) + ' MB)…');
       // sync mode = a normal transcription; the script is matched to it afterwards (and again on every Rebuild)
       var call = s.mode === 'align'
-        ? window.OmniEleven.align(s.apiKey, a.path, $('script').value.trim())
+        ? window.OmniEleven.align(s.apiKey, a.path, window.OmniSync.cleanScript($('script').value).text)
         : window.OmniEleven.transcribe(s.apiKey, a.path, { language: s.language });
       return call;
     }).then(function (res) {
@@ -249,6 +276,7 @@
     var s = save();
     busy(true);
     jsx('omni_seqInfo', [s.tracks || 'all']).then(function (info) {
+      pickUpScriptFile(info, false);
       var f = wordsFile(info);
       if (!fs.existsSync(f)) throw new Error('No saved transcript for this sequence yet — run "Transcribe & caption" once.');
       var words = JSON.parse(fs.readFileSync(f, 'utf8')).words;
@@ -265,6 +293,7 @@
     $('pickPreset').onclick = pickPreset;
     $('learn').onclick = learnFromSrt;
     $('loadNotion').onclick = loadNotion;
+    $('loadScriptFile').onclick = loadScriptFile;
     $('script').addEventListener('change', save);
     $('saveFixes').onclick = saveFixes;
     $('pickRules').onclick = function () {
