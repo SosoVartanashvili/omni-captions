@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.omni.captions" ExtensionBundleVersion="1.2.0"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.omni.captions" ExtensionBundleVersion="1.2.1"
   ExtensionBundleName="OMNI Captions" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.omni.captions.panel" Version="1.2.0"/>
+    <Extension Id="com.omni.captions.panel" Version="1.2.1"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

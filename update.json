@@ -1,11 +1,11 @@
 {
- "version": "1.2.0",
- "notes": "Self-update",
+ "version": "1.2.1",
+ "notes": "Fix: update check",
  "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "29c1a6afa2620d81b1567006522207ac2dd50c7ca7eb14c5cbb425992cd630f9"
+   "sha256": "93828725b42991a67997b38dd58c769962e8b08bd3e098cace730ead9f1d49e6"
   },
   {
    "path": "css/style.css",
@@ -33,7 +33,7 @@
   },
   {
    "path": "js/updater.js",
-   "sha256": "359547728e08264dd2bed2042101c2ddd4eeedb8fca5c7de9e8294188615325d"
+   "sha256": "25f5e8b2ff280d9fb56fe667f967957c34b1d310ca07e830d5ce57fc8be3070e"
   },
   {
    "path": "jsx/host.jsx",

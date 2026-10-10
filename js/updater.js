@@ -20,7 +20,11 @@
       var u = new URL(url);
       if (u.protocol !== 'https:' && !/^(localhost|127\.0\.0\.1)$/.test(u.hostname)) return reject(new Error('Updates only over https'));
       var mod = u.protocol === 'http:' ? http : https;
-      var r = mod.get(u, { headers: { 'User-Agent': 'omni-captions', 'Cache-Control': 'no-cache' } }, function (res) {
+      // plain options object: inside the panel `URL` is the browser's class, which Node's http does not accept
+      var r = mod.get({
+        protocol: u.protocol, hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search,
+        headers: { 'User-Agent': 'omni-captions', 'Cache-Control': 'no-cache' }
+      }, function (res) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 5) {
           res.resume();
           return resolve(get(new URL(res.headers.location, url).toString(), redirects + 1));
