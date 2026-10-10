@@ -42,7 +42,10 @@
     if (h.length === 2 && TENS.hasOwnProperty(h[0]) && UNITS.hasOwnProperty(h[1])) return c;
     return null;
   }
-  function fmt(n) { return n >= 1000 ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : String(n); }
+  function fmt(n, isYear) {
+    if (isYear) return String(n);                                   // a year: 2025, not 2,025
+    return n >= 1000 ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : String(n);
+  }
 
   function numbersToDigits(words) {
     var out = [], i = 0;
@@ -60,8 +63,22 @@
       var nextC = j < words.length ? core(words[j].text) : '';
       if (parts.length === 1 && parts[0] === 'one' && !COUNTED.test(nextC)) { out.push(words[i]); i++; continue; }
       if (parts.length === 1 && SCALE[parts[0]]) { out.push(words[i]); i++; continue; }   // "hundreds", "a thousand" stay words
-      var total = 0, cur = 0;
+      var total = 0, cur = 0, isYear = false;
+      // years and pairs: "twenty twenty-five" -> 2025, "nineteen ninety-nine" -> 1999 (not 20+25 = 45)
+      var atoms = [], hasScale = false;
       parts.forEach(function (p) {
+        if (SCALE[p]) { hasScale = true; return; }
+        var v = p.split('-').reduce(function (acc, q) { return acc + (UNITS.hasOwnProperty(q) ? UNITS[q] : TENS[q]); }, 0);
+        var last = atoms[atoms.length - 1];
+        if (last && last.tens && v < 10 && p.indexOf('-') < 0) { last.v += v; last.tens = false; }   // "twenty" + "five" = 25
+        else atoms.push({ v: v, tens: TENS.hasOwnProperty(p) });
+      });
+      if (!hasScale && atoms.length >= 2 && atoms[0].v >= 10) {
+        total = Number(atoms.map(function (a, ix) { return ix === 0 ? String(a.v) : (a.v < 10 ? '0' + a.v : String(a.v)); }).join(''));
+        cur = 0; isYear = true;
+        atoms = null;
+      }
+      if (atoms) parts.forEach(function (p) {
         p.split('-').forEach(function (q) {
           if (UNITS.hasOwnProperty(q)) cur += UNITS[q];
           else if (TENS.hasOwnProperty(q)) cur += TENS[q];
@@ -70,8 +87,9 @@
         });
       });
       total += cur;
+      if (hasScale && total > 2000 && total < 2100) isYear = true;   // "two thousand twenty-five" -> 2025
       var first = words[i], last = words[j - 1], lp = splitPunct(last.text), fp = splitPunct(first.text);
-      var txt = fmt(total), endT = last.end, post = lp.post;
+      var txt = fmt(total, isYear), endT = last.end, post = lp.post;
       if (core(nextC) === 'percent' && !post) {                      // "fifty percent" -> "50%"
         var pw = words[j]; txt += '%'; post = splitPunct(pw.text).post; endT = pw.end; j++;
       }
@@ -92,6 +110,8 @@
 
   // learned fixes first, then the brand rules on top (so "omni creating gummies" -> fix -> brand casing)
   function applyFixes(words, fixes) {
+    // ElevenLabs puts "spacing" / "audio_event" tokens between words — drop them so phrases and numbers stay joined
+    words = (words || []).filter(function (w) { return (!w.type || w.type === 'word') && String(w.text || '').trim(); });
     var learned = {}, brand = {};
     Object.keys(fixes || {}).forEach(function (k) { var to = fixes[k]; learned[k] = (to && to.to !== undefined) ? to.to : to; });
     BRAND.forEach(function (b) { brand[b[0]] = b[1]; });

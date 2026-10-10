@@ -48,7 +48,7 @@
     'a an the my your his her our their its some any no');
   // words that belong to the word after them (never end a line / caption on them)
   var GLUE_NEXT = toSet('a an the my your his her our their its this these those some any no every either neither ' +
-    'very so too such what which whose ' +
+    'very so too such what which whose more most less fewer like ' +
     'to of in on at for from with by about into onto over under through between as than not just only even also really');
 
   function toSet(s) { var o = {}; s.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
@@ -147,8 +147,9 @@
     if (SOFT_END.test(prev)) s -= 0.9;                       // after a comma / colon: best
     else if (CHUNK_START[n] && !GLUE_NEXT[p]) s -= 0.4;      // before "of / that / are / because …"
     else if (!GLUE_NEXT[p]) s += 1.2;                        // between two content words: "creatine | brands", "lean | muscle"
-    if (GLUE_NEXT[p]) s += 1.0;                              // never end on "the", "of", "so", "many" …
-    if (ARTICLE[p]) s += 1.5;
+    var soft = SOFT_END.test(prev);
+    if (GLUE_NEXT[p] && !soft) s += 1.0;                              // never end on "the", "of", "so", "many" …
+    if (ARTICLE[p] && !soft) s += 1.5;
     if (/^(and|but|or|nor|so|because|that|if|when|while)$/.test(p) && !SOFT_END.test(prev)) s += 1.2;
     if (/^(must|can|could|will|would|should|might|may|do|does|did|am|is|are|was|were|be|been|has|have|had|i'm|you're|they're|we're|it's|he's|she's|that's|i've|you've|we've|they've|i'll|you'll|won't|can't|don't|doesn't|didn't)$/.test(p) && !CHUNK_START[n] && !SOFT_END.test(prev)) s += 0.9;   // "must | be safe", "they are | likely"    // never end on "and / but / because"                                 // and really never on "the / a / my / their" …
     if (/^\d/.test(next) && GLUE_NEXT[p]) s += 0.5;           // "the | 3 grams"

@@ -1,11 +1,11 @@
 {
- "version": "1.4.3",
- "notes": "2nd line never a single word",
+ "version": "1.4.4",
+ "notes": "Years as 2025, number fixes, better phrase breaks",
  "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "1a6639596acb43d89e7e1251930302be7f52159a01b406ad2fa97e383943c208"
+   "sha256": "e5d0c1b5d7840d2c8067eaea3826f58089136f79b56ef119db1553ea9ac4657c"
   },
   {
    "path": "css/style.css",
@@ -17,7 +17,7 @@
   },
   {
    "path": "js/captions.js",
-   "sha256": "83a8bac0d2158faefc77784537a8a75f2e9b10873d38862c363a429e37fc0b59"
+   "sha256": "9f990e63297ef04123f8ab055dd866d93ad664a6152fde905ed29e6d59ed6b35"
   },
   {
    "path": "js/elevenlabs.js",
@@ -25,7 +25,7 @@
   },
   {
    "path": "js/learn.js",
-   "sha256": "eb743d3d9792e9a414d69f42a3575f8cdfd0c90e10caa4c7a24ed8d9200774b5"
+   "sha256": "d95b4f4a3880e2157c5e30be72c311f68dd375e55275d97649aaa6654b7ea932"
   },
   {
    "path": "js/main.js",
