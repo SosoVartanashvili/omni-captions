@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Avto MAGARI KLEXAR</title>
+  <title>Soso Captions</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>Avto MAGARI KLEXAR <span id="ver" class="ver"></span></h1>
+  <h1>Soso Captions <span id="ver" class="ver"></span></h1>
   <div id="updBar"><span id="updText"></span><button id="updBtn" class="primary">Update now</button></div>
 
   <div class="row">
@@ -30,7 +30,7 @@
 
   <details>
     <summary>Caption style</summary>
-    <label>Preset<select id="stylePreset"><option value="basic-ugc">Basic (UGC) non background</option></select></label>
+    <label>Preset<select id="stylePreset"><option value="basic-ugc">Basic (UGC) non background</option><option value="one-word">One word (TikTok)</option></select></label>
     <div id="styleInfo" class="hint"></div>
     <p class="hint">Premiere does not let panels set caption fonts, so the style is applied once per project:
       select the new caption track › Essential Graphics › set the values above › Track Style › Create Style… › name it
@@ -50,6 +50,7 @@
     </div>
     <label class="check"><input id="upper" type="checkbox"> UPPERCASE</label>
     <label class="check"><input id="noDotsCommas" type="checkbox"> Remove all periods and commas</label>
+    <label class="check"><input id="oneWord" type="checkbox"> One word at a time (TikTok style)</label>
     <label class="check"><input id="stripEndPunct" type="checkbox"> Drop . , only at the end of captions</label>
   </details>
 
@@ -81,7 +82,8 @@
 
   <details id="adminBox" style="display:none">
     <summary>Devices (admin)</summary>
-    <p class="hint">Every computer that opened a Soso panel with the shared learning folder set. Block / Unblock writes
+    <p class="hint">Every computer that opened a Soso panel with the shared learning folder set. Shows name, computer, public IP + city, local IPs and hardware id.
+      Block = this computer (even if the panel is reinstalled); Block IP = everyone on that internet connection. Both write
       <b>access.json</b>; upload it to the root of the GitHub repo and the change reaches every panel the next time it opens.</p>
     <button id="refreshDevices" class="small" style="width:auto;margin:0 0 6px">Refresh</button>
     <div id="devices"></div>

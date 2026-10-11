@@ -10,15 +10,20 @@
     'basic-ugc': {
       name: 'Basic (UGC) non background',
       text: 'Proxima Nova Semibold · 60 · centred · bottom-centre zone · fill white · stroke black 6.5 px centre · no background · no shadow',
-      rules: { maxChars: 24, maxLines: 2 }
+      rules: { maxChars: 24, maxLines: 2, oneWord: false }
+    },
+    'one-word': {
+      name: 'One word (TikTok)',
+      text: 'One word on screen at a time, on the word timing · same phrases and cuts as Basic · Proxima Nova Bold · 80 · centred · middle-lower zone',
+      rules: { maxChars: 24, maxLines: 2, oneWord: true }
     }
   };
   function applyPreset(setRules) {
     var p = PRESETS[$('stylePreset').value] || PRESETS['basic-ugc'];
     $('styleInfo').textContent = p.text;
-    if (setRules) { $('maxChars').value = p.rules.maxChars; $('maxLines').value = p.rules.maxLines; }
+    if (setRules) { $('maxChars').value = p.rules.maxChars; $('maxLines').value = p.rules.maxLines; $('oneWord').checked = !!p.rules.oneWord; }
   }
-  var KEYS = ['editorName', 'stylePreset', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'noDotsCommas', 'preset', 'rulesDir'];
+  var KEYS = ['editorName', 'stylePreset', 'fillGap', 'updateUrl', 'apiKey', 'mode', 'language', 'maxChars', 'maxLines', 'minDur', 'maxDur', 'tracks', 'upper', 'stripEndPunct', 'noDotsCommas', 'oneWord', 'preset', 'rulesDir'];
 
   /* ---------- settings ---------- */
   function load() {
@@ -39,13 +44,16 @@
     s._v = 2; s._v3 = 1;
     try { localStorage.setItem('omniCaptionsScript', $('script').value || ''); } catch (e) {}
     try { localStorage.setItem('omniCaptions', JSON.stringify(s)); } catch (e) {}
+    // Soso Auto Edit makes its captions with these same settings and learned fixes
+    // (and the same ElevenLabs key — kept only in this computer's user folder, never in the shared folder)
+    try { if (window.SosoAccess) window.SosoAccess.setConfig({ captionStyle: opts(s), rulesFile: rulesPath(), elevenKey: s.apiKey || window.SosoAccess.config().elevenKey || '' }); } catch (e) {}
     return s;
   }
   function opts(s) {
     return {
       maxChars: parseInt(s.maxChars, 10) || 24, maxLines: parseInt(s.maxLines, 10) || 2,
       minDur: parseFloat(s.minDur) || 0.7, maxDur: parseFloat(s.maxDur) || 6,
-      upper: !!s.upper, stripEndPunct: !!s.stripEndPunct, noDotsCommas: !!s.noDotsCommas,
+      upper: !!s.upper, stripEndPunct: !!s.stripEndPunct, noDotsCommas: !!s.noDotsCommas, oneWord: !!s.oneWord,
       fillGap: s.fillGap === '' || s.fillGap === undefined ? 1.5 : (parseFloat(s.fillGap) || 0)
     };
   }
@@ -140,39 +148,77 @@
     $('deviceInfo').textContent = 'This computer: ' + A.deviceId() + ' · ' + os.hostname();
     A.check('Soso Captions', window.OmniUpdater.localVersion(), window.OmniUpdater._get).then(function (r) {
       if (r.blocked) A.lockPanel(document, r);
-    }).catch(function () {});
+      else adminInit();                       // the published admin list is fresh now
+      if (r.me && r.me.ip) $('deviceInfo').textContent += ' · ' + r.me.ip;
+    }).catch(function () { adminInit(); });
   }
+  var adminShown = false;
   function adminInit() {
     var A = window.SosoAccess; if (!A) return;
     var cfg = A.adminConfig(window.OmniUpdater.extensionDir());
-    if (!cfg || !cfg.accessJson) return;
+    if (!cfg || !cfg.accessJson) { $('adminBox').style.display = 'none'; adminShown = false; return; }
     $('adminBox').style.display = 'block';
-    $('accessPath').textContent = 'access.json: ' + cfg.accessJson;
+    $('accessPath').textContent = 'access.json: ' + cfg.accessJson +
+      (cfg.needsUpload ? ' — this computer is registered as the admin; upload access.json to GitHub once so it is locked to this computer.' : '');
+    if (cfg.justRegistered) status('This computer is now the admin of the Soso panels. Upload access.json to GitHub to lock it in.', 'ok');
+    function when(t) { return String(t || '').replace('T', ' ').slice(0, 16); }
     function render() {
       var access = A.readAccessFile(cfg.accessJson), list = A.listDevices(), box = $('devices');
       box.innerHTML = '';
-      if (!list.length) { box.textContent = 'No devices yet. Editors appear here after they open a panel with the shared learning folder set.'; return; }
+      var ipBlocks = (access.blocked || []).filter(function (e) { return e.ip && !e.id; });
+      if (!list.length) { box.textContent = 'No devices yet. Editors appear here after they open a panel with the shared learning folder set.'; }
       list.forEach(function (d) {
-        var blocked = !!A.isBlocked(access, d);
-        var row = document.createElement('div'); row.className = 'dev' + (blocked ? ' blocked' : '');
+        var hit = A.isBlocked(access, d), admin = A.isAdminIn(access, d), blocked = !!hit;
+        var row = document.createElement('div'); row.className = 'dev' + (blocked ? ' blocked' : '') + (admin ? ' admin' : '');
         var who = document.createElement('div'); who.className = 'who';
-        who.textContent = (d.name || '(no name)') + ' — ' + d.computer + (blocked ? '  · BLOCKED' : '');
+        who.textContent = (d.name || '(no name)') + ' — ' + d.computer + (admin ? '  · ADMIN' : '') +
+          (blocked ? '  · BLOCKED' + (hit.ip && !hit.id ? ' (by IP)' : '') : '');
         var meta = document.createElement('div'); meta.className = 'meta';
         var panels = Object.keys(d.panels || {}).map(function (k) { return k.replace('Soso ', '') + ' ' + d.panels[k].version; }).join(', ');
-        meta.textContent = d.os + ' · ' + d.user + ' · ' + panels + ' · last seen ' + String(d.lastSeen).replace('T', ' ').slice(0, 16) +
-          (d.blockedSeen ? ' · tried while blocked ' + String(d.blockedSeen).replace('T', ' ').slice(0, 16) : '') + ' · id ' + d.id;
-        var b = document.createElement('button'); b.textContent = blocked ? 'Unblock' : 'Block'; b.className = blocked ? 'unblock' : '';
-        b.onclick = function () {
-          if (d.id === A.deviceId() && !blocked) { status('That is this computer — not blocking yourself.', 'err'); return; }
-          A.setBlocked(cfg.accessJson, d, !blocked);
-          render();
-          status((blocked ? 'Unblocked ' : 'Blocked ') + (d.name || d.computer) + '. Upload access.json to the root of the GitHub repo to apply it.', 'ok');
-        };
-        row.appendChild(who); row.appendChild(b); row.appendChild(meta); box.appendChild(row);
+        var ips = (d.ipHistory || []).slice(1, 4).map(function (h) { return h.ip; }).join(', ');
+        meta.textContent = d.os + ' · ' + d.user + ' · ' + panels + ' · last seen ' + when(d.lastSeen) +
+          '\nIP ' + (d.ip || '?') + (d.place ? ' (' + d.place + ')' : '') + (ips ? ' · before: ' + ips : '') +
+          ((d.localIps || []).length ? '\nlocal ' + d.localIps.join(', ') : '') +
+          (d.blockedSeen ? '\ntried while blocked ' + when(d.blockedSeen) : '') +
+          '\nid ' + d.id + (d.machine ? ' · machine ' + d.machine : '') + ' · first seen ' + when(d.firstSeen);
+        var btns = document.createElement('div'); btns.className = 'btns';
+        if (!admin) {
+          var b = document.createElement('button');
+          var byIp = blocked && hit.ip && !hit.id;
+          b.textContent = blocked ? 'Unblock' : 'Block'; b.className = blocked ? 'unblock' : '';
+          b.onclick = function () {
+            try { A.setBlocked(cfg.accessJson, byIp ? { ip: hit.ip } : d, !blocked, '', byIp ? 'ip' : ''); }
+            catch (e) { status(e.message, 'err'); return; }
+            render();
+            status((blocked ? 'Unblocked ' : 'Blocked ') + (d.name || d.computer) + '. Upload access.json to the root of the GitHub repo to apply it.', 'ok');
+          };
+          btns.appendChild(b);
+          if (!blocked && d.ip) {
+            var bi = document.createElement('button'); bi.textContent = 'Block IP'; bi.className = 'small';
+            bi.title = 'Blocks every computer that uses ' + d.ip + ' (same Wi-Fi / office). The admin computer is never blocked.';
+            bi.onclick = function () {
+              A.setBlocked(cfg.accessJson, d, true, '', 'ip'); render();
+              status('Blocked IP ' + d.ip + '. Upload access.json to GitHub to apply it.', 'ok');
+            };
+            btns.appendChild(bi);
+          }
+        }
+        row.appendChild(who); row.appendChild(btns); row.appendChild(meta); box.appendChild(row);
+      });
+      ipBlocks.forEach(function (e) {
+        if (list.some(function (d) { return d.ip === e.ip; })) return;
+        var row = document.createElement('div'); row.className = 'dev blocked';
+        var who = document.createElement('div'); who.className = 'who'; who.textContent = 'IP ' + e.ip + '  · BLOCKED';
+        var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = (e.label || '') + ' · since ' + when(e.since);
+        var b = document.createElement('button'); b.textContent = 'Unblock'; b.className = 'unblock';
+        b.onclick = function () { A.setBlocked(cfg.accessJson, { ip: e.ip }, false, '', 'ip'); render(); status('Unblocked IP ' + e.ip + '. Upload access.json to GitHub.', 'ok'); };
+        var btns = document.createElement('div'); btns.className = 'btns'; btns.appendChild(b);
+        row.appendChild(who); row.appendChild(btns); row.appendChild(meta); box.appendChild(row);
       });
     }
     $('refreshDevices').onclick = render;
     render();
+    adminShown = true;
   }
 
   /* ---------- the shared rules file (learned fixes) ---------- */
@@ -332,7 +378,6 @@
     $('editorName').addEventListener('change', syncShared);
     $('rulesDir').addEventListener('change', syncShared);
     accessCheck();
-    adminInit();
     $('checkUpd').onclick = function () { checkUpdate(true); };
     setTimeout(function () { checkUpdate(false); }, 1200);
     $('mode').onchange = function () { toggleScript(); save(); };

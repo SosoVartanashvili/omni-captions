@@ -1,27 +1,27 @@
 {
- "version": "1.5.0",
- "notes": "Devices list + access control",
+ "version": "1.5.5",
+ "notes": "One-word (TikTok) caption mode: Preset 'One word' or the checkbox; same phrases and cuts, one word on screen at a time",
  "restart": false,
  "files": [
   {
    "path": "CSXS/manifest.xml",
-   "sha256": "96e6339981d5b68ecb2f88d9210a485dc7fc25cf1391657373b1ae628bd13e44"
+   "sha256": "b2002392f655c54b156d3993df177de6a209ab8bfcd974a4dee865e1b75b6952"
   },
   {
    "path": "css/style.css",
-   "sha256": "a6dae0e3c9ea7d867d95b0705958bb9ec6541cf59a2e849e3e59b77076c0d81e"
+   "sha256": "70c9c110495c5ee243abab3c0b1bfe985d243e35c573aa6f78493d7990092bea"
   },
   {
    "path": "index.html",
-   "sha256": "2a788da4566a50836a42951607664967ba8e08e50b84d87ab59f689eba2f9300"
+   "sha256": "b5e729919b2ca0ca7c28f965d024af784dad484cc54cff540c7bc24d208c9734"
   },
   {
    "path": "js/access.js",
-   "sha256": "df85b3ec817cebb53221bb4eb6e34897204362b09be41f2b89b028f864c75567"
+   "sha256": "131a4df422561fdbe418145db810b097faea73ce5cf29e015bcc435d5c2def10"
   },
   {
    "path": "js/captions.js",
-   "sha256": "9f990e63297ef04123f8ab055dd866d93ad664a6152fde905ed29e6d59ed6b35"
+   "sha256": "93360602e266736f4075cf9357bde94e77e886ff72ec2d037904fc32e5936768"
   },
   {
    "path": "js/elevenlabs.js",
@@ -33,7 +33,7 @@
   },
   {
    "path": "js/main.js",
-   "sha256": "690e8a3dc87bd53274a8adf4e6144c113e262a11f836ac273d4c3eb424f25a98"
+   "sha256": "5e5d59ef5e76dddfe7aa3f0f9c820e51802d5620534b16982e02c5d43c990f0f"
   },
   {
    "path": "js/sync.js",

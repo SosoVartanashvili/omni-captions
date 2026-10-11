@@ -31,7 +31,9 @@
     fillGap: 1.5,      // pauses up to this long are filled: no empty frames between captions (0 = off)
     upper: false,
     stripEndPunct: false,
-    noDotsCommas: false  // remove every . , … from the captions (not inside numbers: 4.8, 2,000)
+    noDotsCommas: false, // remove every . , … from the captions (not inside numbers: 4.8, 2,000)
+    oneWord: false,      // one word on screen at a time (TikTok style); phrases are still cut-aware
+    oneWordMin: 0.14     // a word shorter than this (3-4 frames) is shown together with the next one
   };
 
   var SENT_END = /[.!?…]["'”’)\]]*$/;
@@ -53,6 +55,19 @@
 
   function toSet(s) { var o = {}; s.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
   function bare(t) { return String(t).toLowerCase().replace(/[^a-z0-9']/g, ''); }
+
+  // "a few weeks in | and said", "she picked it up | and left", "I worked it out, then":
+  // a preposition with no object after it is an adverb that CLOSES the phrase — it belongs to the
+  // words before it, not to the next caption (it is not "in the house", "up the stairs")
+  var PARTICLE = toSet('in on out up off back over down away around along through by home ago apart aside ahead behind inside outside together');
+  var CLAUSE_START = toSet('and but so or nor then when while because cause cuz if until though although unless whereas ' +
+    'i you he she we they i\'m you\'re he\'s she\'s we\'re they\'re i\'ve i\'d i\'ll');
+  function isParticle(ws, i) {
+    if (i < 0 || i >= ws.length || !PARTICLE[bare(ws[i].text)]) return false;
+    if (SENT_END.test(ws[i].text) || SOFT_END.test(ws[i].text) || ws[i].eol) return true;
+    if (i === ws.length - 1) return false;                 // unknown what follows: keep the old rule
+    return !!CLAUSE_START[bare(ws[i + 1].text)];
+  }
 
   function merge(opts) {
     var o = {}, k;
@@ -95,13 +110,19 @@
   /* ---------- text helpers ---------- */
 
   function joinText(ws) { return ws.map(function (w) { return w.text; }).join(' '); }
+  // width as it will be shown: with "no dots/commas" those characters do not take room
+  function shownLen(ws, o) {
+    var t = joinText(ws);
+    if (o && o.noDotsCommas) t = t.replace(/(\d)[.,](\d)/g, '$1#$2').replace(/[.,…]/g, '');
+    return t.length;
+  }
 
   // how good the best 2-line layout of these words is (0 = fits on one line)
   function layoutCost(ws, o) {
-    if (ws.length === 1 || joinText(ws).length <= o.maxChars) return 0;
+    if (ws.length === 1 || shownLen(ws, o) <= o.maxChars) return 0;
     var best = Infinity;
     for (var k = 1; k < ws.length - 1; k++) {                 // the 2nd line is never a single word
-      if (joinText(ws.slice(0, k)).length > o.maxChars || joinText(ws.slice(k)).length > o.maxChars) continue;
+      if (shownLen(ws.slice(0, k), o) > o.maxChars || shownLen(ws.slice(k), o) > o.maxChars) continue;
       best = Math.min(best, breakScore(ws, k, false));
     }
     return best === Infinity ? 3 : Math.max(0, best + 0.6);
@@ -109,13 +130,13 @@
 
   function layout(ws, o) {
     var text = joinText(ws);
-    if (ws.length === 1 || text.length <= o.maxChars) return [text];
+    if (ws.length === 1 || shownLen(ws, o) <= o.maxChars) return [text];
     if (o.maxLines < 2) return null;
     var best = null, bestScore = Infinity;
     for (var k = 1; k < ws.length - 1; k++) {                 // the 2nd line is never a single word
       var a = joinText(ws.slice(0, k)), b = joinText(ws.slice(k));
-      if (a.length > o.maxChars || b.length > o.maxChars) continue;
-      var s = breakScore(ws, k, false);
+      if (shownLen(ws.slice(0, k), o) > o.maxChars || shownLen(ws.slice(k), o) > o.maxChars) continue;
+      var s = breakScore(ws, k, false) + (k === 1 ? 1.0 : 0);      // a lone word on line 1 looks broken too
       if (s < bestScore) { bestScore = s; best = [a, b]; }
     }
     return best;
@@ -144,15 +165,21 @@
     var la = joinText(ws.slice(0, k)).length, lb = joinText(ws.slice(k)).length;
     var s = Math.abs(la - lb) / Math.max(1, la + lb) * 0.6;
     var prev = ws[k - 1].text, next = ws[k].text, p = bare(prev), n = bare(next);
+    var prevPart = isParticle(ws, k - 1), nextPart = isParticle(ws, k);
+    var glueP = GLUE_NEXT[p] && !prevPart, chunkN = CHUNK_START[n] && !nextPart;
     if (SOFT_END.test(prev)) s -= 0.9;                       // after a comma / colon: best
-    else if (CHUNK_START[n] && !GLUE_NEXT[p]) s -= 0.4;      // before "of / that / are / because …"
-    else if (!GLUE_NEXT[p]) s += 1.2;                        // between two content words: "creatine | brands", "lean | muscle"
+    else if (nextPart) s += 1.6;                             // "a few weeks | in and said": never cut off the particle
+    else if (prevPart && CHUNK_START[n]) s -= 0.6;           // "a few weeks in | and said": a clean phrase end
+    else if (chunkN && !glueP) s -= 0.4;                     // before "of / that / are / because …"
+    else if (!glueP) s += 1.2;                               // between two content words: "creatine | brands", "lean | muscle"
     var soft = SOFT_END.test(prev);
-    if (GLUE_NEXT[p] && !soft) s += 1.0;                              // never end on "the", "of", "so", "many" …
+    if (glueP && !soft) s += 1.0;                                     // never end on "the", "of", "so", "many" …
     if (ARTICLE[p] && !soft) s += 1.5;
+    if (/^(i|you|he|she|we|they|it)$/.test(p) && !soft && /^(was|were|am|is|are|had|have|has|will|would|could|can|did|do|does|should|might|must|never|just|still|always)$/.test(n)) s += 1.8;   // "like I | was" — subject stays with its verb
+    if (p === 'that' && !soft && k >= 2 && /^(in|on|at|from|of|to|for|with|by|into|about|like)$/.test(bare(ws[k - 2].text))) s += 1.5;   // "in that | house"
     if (/^(and|but|or|nor|so|because|that|if|when|while)$/.test(p) && !SOFT_END.test(prev)) s += 1.2;
     if (/^(must|can|could|will|would|should|might|may|do|does|did|am|is|are|was|were|be|been|has|have|had|i'm|you're|they're|we're|it's|he's|she's|that's|i've|you've|we've|they've|i'll|you'll|won't|can't|don't|doesn't|didn't)$/.test(p) && !CHUNK_START[n] && !SOFT_END.test(prev)) s += 0.9;   // "must | be safe", "they are | likely"    // never end on "and / but / because"                                 // and really never on "the / a / my / their" …
-    if (/^\d/.test(next) && GLUE_NEXT[p]) s += 0.5;           // "the | 3 grams"
+    if (/^\d/.test(next) && glueP) s += 0.5;           // "the | 3 grams"
     if (/^[\d$]/.test(prev) && !SOFT_END.test(prev)) s += 0.8; // "3 | grams", "$67 | off"
     if (k === 1 || ws.length - k === 1) s += 0.8;            // no single word left alone
     if (isBrandPair(prev, next)) s += 10;                    // OMNI Creatine Gummies is never split
@@ -161,7 +188,8 @@
   }
 
   function splitToFit(ws, o) {
-    if (fits(ws, o)) return [ws];
+    var whole = fits(ws, o), wholeCost = whole ? layoutCost(ws, o) : 0;
+    if (whole && wholeCost < 1.2) return [ws];
     var best = 1, bestScore = Infinity;
     for (var k = 1; k < ws.length; k++) {
       var s = breakScore(ws, k, true);
@@ -170,6 +198,17 @@
       s += 0.7 * (layoutCost(ws.slice(0, k), o) + layoutCost(ws.slice(k), o));   // both halves must also break into good lines
       if (s < bestScore) { bestScore = s; best = k; }
     }
+    // it fits, but only with an ugly line break ("Straight posture toned / arms defined waists"):
+    // split into two captions only when that is clearly better ("Straight posture / toned arms" + "defined waists")
+    // it fits, but only with a broken line end ("Creatine supports your / muscles …"): two captions
+    // instead, when the split itself is a clean phrase boundary and both halves read well
+    var cleanSplit = best >= 2 && ws.length - best >= 2 &&
+                     fits(ws.slice(0, best), o) && fits(ws.slice(best), o) &&
+                     layoutCost(ws.slice(0, best), o) < 1.2 && layoutCost(ws.slice(best), o) < 1.2 &&
+                     dur(ws.slice(0, best)) >= 0.5 && dur(ws.slice(best)) >= 0.5;
+    var goodPoint = SOFT_END.test(ws[best - 1].text) ||
+                    (wholeCost >= 1.9 && breakScore(ws, best, false) <= 0);
+    if (whole && !(cleanSplit && goodPoint && bestScore < wholeCost - 0.8)) return [ws];
     return splitToFit(ws.slice(0, best), o).concat(splitToFit(ws.slice(best), o));
   }
 
@@ -205,8 +244,36 @@
       if (L0.endWhy !== 'cut') continue;
       if (SENT_END.test(L0.ws[L0.ws.length - 1].text) || L0.ws[L0.ws.length - 1].eol) continue;   // cut on a sentence end: nothing to fix
       var all = L0.ws.concat(R0.ws), base = L0.ws.length, cutT = cuts[R0.ws[0].shot - 1];
-      var bestK = base, bestS = breakScore(all, base, false);
-      for (var k2 = Math.max(1, base - 3); k2 <= Math.min(all.length - 1, base + 3); k2++) {
+      // time a word is sung on the "wrong" side of the cut when the split is at k: a phrase
+      // that is mostly sung before the cut stays before it ("toned arms, defined waists |"),
+      // instead of jumping to the next shot because of one short tail past the cut
+      var wrongT = function (k) {
+        var t = 0;
+        for (var z = 0; z < all.length; z++) {
+          var a = all[z].start, b = all[z].end;
+          t += z < k ? Math.max(0, b - Math.max(a, cutT)) : Math.max(0, Math.min(b, cutT) - a);
+        }
+        return t + (all.length - k === 1 ? 0.8 / 1.5 : 0);   // a single word alone after the cut flashes
+      };
+      // k = 0 / k = all.length: the whole phrase goes to one side of the cut
+      // ("The most senior woman in the household saw me sneak." stays whole instead of "… saw | me sneak")
+      var prevPh = phrases[pi - 1];
+      var edgeScore = function (k) {
+        if (k > 0 && k < all.length) return breakScore(all, k, false);
+        if (k === all.length) {
+          var lw = all[k - 1];
+          if (SENT_END.test(lw.text) || lw.eol) return -1.2;
+          if (SOFT_END.test(lw.text)) return -0.9;
+          return R0.endWhy === 'gap' ? -0.5 : 0.6;
+        }
+        if (!prevPh) return -1.2;
+        var pw = prevPh.ws[prevPh.ws.length - 1];
+        if (SENT_END.test(pw.text) || pw.eol) return -1.2;
+        if (SOFT_END.test(pw.text)) return -0.9;
+        return prevPh.endWhy === 'gap' ? -0.5 : 0.6;
+      };
+      var bestK = base, bestS = breakScore(all, base, false) + 1.5 * wrongT(base);
+      for (var k2 = Math.max(0, base - 3); k2 <= Math.min(all.length, base + 3); k2++) {
         if (k2 === base) continue;
         if (k2 < base && all[k2].end < cutT - 0.6) continue;          // words moving right must touch the cut
         if (k2 > base && all[k2 - 1].start > cutT + 0.6) continue;    // words moving left must touch the cut
@@ -214,7 +281,12 @@
         var sentInside = false, qa = k2 < base ? k2 : base - 1, qb = k2 < base ? base - 1 : k2 - 2;
         for (var q2 = qa; q2 <= qb; q2++) if (SENT_END.test(all[q2].text) || all[q2].eol) sentInside = true;
         if (sentInside) continue;
-        var sc2 = breakScore(all, k2, false) + 0.35 * Math.abs(k2 - base);
+        if ((k2 === 0 || k2 === all.length) && dur(all) > o.maxDur) continue;
+        // a whole phrase only crosses when it really straddles the cut (its last / first word touches it)
+        if (k2 === 0 && L0.ws[L0.ws.length - 1].end < cutT - 0.15) continue;
+        if (k2 === all.length && R0.ws[0].start > cutT + 0.15) continue;
+        if ((k2 === 0 || k2 === all.length) && wrongT(k2) > 0.35) continue;   // only a short tail may cross
+        var sc2 = edgeScore(k2) + 0.35 * Math.abs(k2 - base) + 1.5 * wrongT(k2);
         if (sc2 < bestS - 0.2) { bestS = sc2; bestK = k2; }
       }
       if (bestK !== base) {
@@ -222,6 +294,8 @@
         L0.ws = all.slice(0, bestK); R0.ws = all.slice(bestK);
         L0.ws.forEach(function (w) { w.shot = ls; });
         R0.ws.forEach(function (w) { w.shot = rs; });
+        if (!R0.ws.length) { L0.endWhy = R0.endWhy; phrases.splice(pi + 1, 1); }
+        else if (!L0.ws.length) { phrases.splice(pi, 1); pi--; }
       }
     }
 
@@ -350,6 +424,39 @@
       nbz.words = caps[z - 1] ? nbz.words.concat(caps[z].words) : caps[z].words.concat(nbz.words);
       nbz.lines = layout(nbz.words, o) || forceLines(nbz.words, o);
       caps.splice(z, 1); z--;
+    }
+
+    // 6b. one word at a time: every caption becomes a run of single-word captions on the word
+    //     timings; the run fills the caption's time exactly (no gaps), stays inside its shot,
+    //     and words too short to read share a caption with the next one
+    if (o.oneWord) {
+      var ow = [], minW = +o.oneWordMin || 0.18;
+      caps.forEach(function (c) {
+        var ws = c.words, n = ws.length;
+        if (n <= 1) { ow.push({ start: c.start, end: c.end, words: ws, shot: c.shot }); return; }
+        // boundaries between words: the start of each next word, kept inside [c.start, c.end]
+        var pts = [c.start];
+        for (var i = 1; i < n; i++) pts.push(Math.min(Math.max(ws[i].start, pts[i - 1] + frame), c.end - frame));
+        pts.push(c.end);
+        var groups = [], cur = [0];
+        for (var g = 1; g < n; g++) {
+          if (pts[g] - pts[cur[0]] < minW) { cur.push(g); continue; }   // too short: keep gathering
+          groups.push(cur); cur = [g];
+        }
+        groups.push(cur);
+        // a last group that is too short joins the previous one
+        if (groups.length > 1 && pts[n] - pts[groups[groups.length - 1][0]] < minW) {
+          var lastG = groups.pop(); groups[groups.length - 1] = groups[groups.length - 1].concat(lastG);
+        }
+        groups.forEach(function (gr, k) {
+          var a = Math.round(pts[gr[0]] / frame) * frame, b = k === groups.length - 1 ? c.end : Math.round(pts[groups[k + 1][0]] / frame) * frame;
+          if (b <= a) b = a + frame;
+          ow.push({ start: a, end: b, words: gr.map(function (i) { return ws[i]; }), shot: c.shot });
+        });
+      });
+      for (var w2 = 0; w2 < ow.length - 1; w2++) if (ow[w2].end > ow[w2 + 1].start) ow[w2].end = ow[w2 + 1].start;
+      caps = ow.filter(function (c) { return c.end > c.start; });
+      caps.forEach(function (c) { c.lines = [joinText(c.words)]; });
     }
 
     // 7. text style
